@@ -1,0 +1,849 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Jira Migration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+    <p class="text-muted mb-0">Manage environment variables, configurations and certificates</p>
+</div>
+
+<!-- Nav tabs for settings sections -->
+<ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="env-tab" data-bs-toggle="tab" data-bs-target="#env-pane" type="button" role="tab">
+            <i class="bi bi-gear"></i> Environment Variables
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="configs-tab" data-bs-toggle="tab" data-bs-target="#configs-pane" type="button" role="tab">
+            <i class="bi bi-sliders"></i> Saved Configurations
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="certs-tab" data-bs-toggle="tab" data-bs-target="#certs-pane" type="button" role="tab">
+            <i class="bi bi-shield-lock"></i> Certificates
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-pane" type="button" role="tab">
+            <i class="bi bi-info-circle"></i> System Info
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="settingsTabContent">
+    <!-- Environment Variables Tab -->
+    <div class="tab-pane fade show active" id="env-pane" role="tabpanel">
+        <div class="card">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Environment Variables</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary me-2" onclick="exportEnvVars()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="showEnvModal()">
+                        <i class="bi bi-plus"></i> Add Variable
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Category filters -->
+                <div class="mb-3">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" onclick="filterEnvVars('')" id="filter-all">All</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('jira')" id="filter-jira">Jira</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('sharepoint')" id="filter-sharepoint">SharePoint</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('azure')" id="filter-azure">Azure/Entra ID</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('email')" id="filter-email">Email</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('api')" id="filter-api">API</button>
+                    </div>
+                </div>
+                
+                <div id="envVarsList">
+                    <div class="text-center text-muted py-4">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Configurations Tab -->
+    <div class="tab-pane fade" id="configs-pane" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Saved Configurations</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showConfigModal()">
+                            <i class="bi bi-plus"></i> New
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="configList">
+                            <div class="text-center text-muted py-4">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificates Tab -->
+    <div class="tab-pane fade" id="certs-pane" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Certificates</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showCertModal()">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="certList">
+                            <div class="text-center text-muted py-4">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Info Tab -->
+    <div class="tab-pane fade" id="system-pane" role="tabpanel">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">System Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Application</h6>
+                        <table class="table table-sm">
+                            <tr><td>Version</td><td><code>2.0.0</code></td></tr>
+                            <tr><td>Framework</td><td><code>FastAPI</code></td></tr>
+                            <tr><td>Worker</td><td><code>Celery</code></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Database</h6>
+                        <table class="table table-sm">
+                            <tr><td>Type</td><td><code>SQLite</code></td></tr>
+                            <tr><td>Status</td><td><span class="badge bg-success">Connected</span></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Authentication</h6>
+                        <table class="table table-sm">
+                            <tr><td>Provider</td><td><code>Microsoft Entra ID</code></td></tr>
+                            <tr><td>Status</td><td id="authStatus"><span class="badge bg-secondary">Checking...</span></td></tr>
+                            <tr><td>Method</td><td id="authMethod"><code>-</code></td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Environment Variable Edit Modal -->
+<div class="modal fade" id="envModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="envModalTitle">Edit Variable</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="envForm">
+                    <input type="hidden" id="envKey">
+                    <input type="hidden" id="envIsNew">
+                    
+                    <div class="mb-3" id="envKeyGroup">
+                        <label class="form-label">Variable Name*</label>
+                        <input type="text" class="form-control" id="envKeyInput" placeholder="MY_VARIABLE">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Value</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="envValue" placeholder="Enter value">
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleEnvValue()">
+                                <i class="bi bi-eye" id="envValueToggle"></i>
+                            </button>
+                        </div>
+                        <div class="form-text" id="envSecretNote" style="display: none;">
+                            <i class="bi bi-lock"></i> This is a secret value and will be encrypted
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" id="envDescription">
+                    </div>
+                    
+                    <div class="row mb-3" id="envNewFields" style="display: none;">
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="envCategory">
+                                <option value="general">General</option>
+                                <option value="jira">Jira</option>
+                                <option value="sharepoint">SharePoint</option>
+                                <option value="azure">Azure/Entra ID</option>
+                                <option value="email">Email</option>
+                                <option value="api">API</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Options</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="envIsSecret">
+                                <label class="form-check-label" for="envIsSecret">Secret (encrypted)</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEnvVar()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalTitle">New Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="configForm">
+                    <input type="hidden" id="configId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Configuration Name*</label>
+                            <input type="text" class="form-control" id="configName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Export Method</label>
+                            <select class="form-select" id="configExportMethod">
+                                <option value="sharepoint">SharePoint</option>
+                                <option value="api">API</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="configDescription" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Vault URL</label>
+                            <input type="url" class="form-control" id="configVaultUrl">
+                        </div>
+                        
+                        <!-- SharePoint Settings -->
+                        <div class="col-12" id="spSettings">
+                            <hr>
+                            <h6>SharePoint Settings</h6>
+                        </div>
+                        <div class="col-md-6" id="spSiteCol">
+                            <label class="form-label">SharePoint Site</label>
+                            <input type="text" class="form-control" id="configSpSite">
+                        </div>
+                        <div class="col-md-6" id="spFolderCol">
+                            <label class="form-label">SharePoint Folder</label>
+                            <input type="text" class="form-control" id="configSpFolder">
+                        </div>
+                        
+                        <!-- API Settings -->
+                        <div class="col-12" id="apiSettings" style="display: none;">
+                            <hr>
+                            <h6>API Settings</h6>
+                        </div>
+                        <div class="col-12" id="customApiCol" style="display: none;">
+                            <label class="form-label">Custom API URL</label>
+                            <input type="url" class="form-control" id="configCustomApiUrl">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Default JQL</label>
+                            <input type="text" class="form-control" id="configDefaultJql">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Parallelism</label>
+                            <input type="number" class="form-control" id="configParallelism" value="5" min="1" max="50">
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="configIsDefault">
+                                <label class="form-check-label" for="configIsDefault">Set as default</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Certificate Modal -->
+<div class="modal fade" id="certModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Certificate</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="certForm">
+                    <div class="mb-3">
+                        <label class="form-label">Certificate Name*</label>
+                        <input type="text" class="form-control" id="certName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Certificate Type*</label>
+                        <select class="form-select" id="certType" required>
+                            <option value="crt">CRT (Certificate)</option>
+                            <option value="pem">PEM (Private Key)</option>
+                            <option value="pfx">PFX (Combined)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Certificate File*</label>
+                        <input type="file" class="form-control" id="certFile" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Client ID (Azure AD)</label>
+                        <input type="text" class="form-control" id="certClientId">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tenant ID</label>
+                        <input type="text" class="form-control" id="certTenantId">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="certDescription" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCert()">Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let configModal, certModal, envModal;
+    let allEnvVars = [];
+    let currentFilter = '';
+
+    $(document).ready(function() {
+        configModal = new bootstrap.Modal(document.getElementById('configModal'));
+        certModal = new bootstrap.Modal(document.getElementById('certModal'));
+        envModal = new bootstrap.Modal(document.getElementById('envModal'));
+        
+        loadEnvVars();
+        loadConfigs();
+        loadCerts();
+        checkServices();
+        checkAuthStatus();
+        
+        // Handle export method change
+        $('#configExportMethod').change(function() {
+            toggleExportSettings($(this).val());
+        });
+    });
+
+    function loadConfigs() {
+        $.get('/api/configurations/', function(data) {
+            renderConfigs(data.configurations);
+        }).fail(function() {
+            $('#configList').html('<div class="text-center text-muted py-4">Failed to load configurations</div>');
+        });
+    }
+
+    function loadCerts() {
+        $.get('/api/configurations/certificates/', function(data) {
+            renderCerts(data.certificates);
+        }).fail(function() {
+            $('#certList').html('<div class="text-center text-muted py-4">Failed to load certificates</div>');
+        });
+    }
+
+    function renderConfigs(configs) {
+        if (!configs || configs.length === 0) {
+            $('#configList').html('<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-1"></i><p class="mt-2">No saved configurations</p></div>');
+            return;
+        }
+        
+        let html = '<div class="list-group list-group-flush">';
+        configs.forEach(config => {
+            html += `
+                <div class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">
+                            ${config.name}
+                            ${config.is_default ? '<span class="badge bg-primary ms-1">Default</span>' : ''}
+                        </h6>
+                        <small class="text-muted">${config.description || config.export_method}</small>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="editConfig(${config.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-success" onclick="useConfig(${config.id})" title="Use">
+                            <i class="bi bi-play"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="deleteConfig(${config.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        $('#configList').html(html);
+    }
+
+    function renderCerts(certs) {
+        if (!certs || certs.length === 0) {
+            $('#certList').html('<div class="text-center text-muted py-4"><i class="bi bi-shield-lock fs-1"></i><p class="mt-2">No certificates uploaded</p></div>');
+            return;
+        }
+        
+        let html = '<div class="list-group list-group-flush">';
+        certs.forEach(cert => {
+            html += `
+                <div class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">
+                            ${cert.name}
+                            ${cert.is_active ? '<span class="badge bg-success ms-1">Active</span>' : ''}
+                        </h6>
+                        <small class="text-muted">${cert.cert_type.toUpperCase()} • ${cert.description || 'No description'}</small>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        ${!cert.is_active ? `<button class="btn btn-outline-success" onclick="activateCert(${cert.id})" title="Activate">
+                            <i class="bi bi-check-lg"></i>
+                        </button>` : ''}
+                        <button class="btn btn-outline-danger" onclick="deleteCert(${cert.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        $('#certList').html(html);
+    }
+
+    function showConfigModal(configId = null) {
+        // Reset form
+        $('#configForm')[0].reset();
+        $('#configId').val('');
+        $('#configModalTitle').text('New Configuration');
+        toggleExportSettings('sharepoint');
+        
+        if (configId) {
+            // Load config data for editing
+            $.get(`/api/configurations/${configId}`, function(config) {
+                $('#configModalTitle').text('Edit Configuration');
+                $('#configId').val(config.id);
+                $('#configName').val(config.name);
+                $('#configDescription').val(config.description);
+                $('#configVaultUrl').val(config.vault_url);
+                $('#configExportMethod').val(config.export_method);
+                $('#configSpSite').val(config.sharepoint_site);
+                $('#configSpFolder').val(config.sharepoint_folder);
+                $('#configCustomApiUrl').val(config.custom_api_url);
+                $('#configDefaultJql').val(config.default_jql);
+                $('#configParallelism').val(config.parallelism);
+                $('#configIsDefault').prop('checked', config.is_default);
+
+                toggleExportSettings(config.export_method);
+            });
+        }
+        
+        configModal.show();
+    }
+
+    function toggleExportSettings(method) {
+        if (method === 'sharepoint') {
+            $('#spSettings, #spSiteCol, #spFolderCol').show();
+            $('#apiSettings, #customApiCol').hide();
+        } else {
+            $('#spSettings, #spSiteCol, #spFolderCol').hide();
+            $('#apiSettings, #customApiCol').show();
+        }
+    }
+
+    function saveConfig() {
+        const configId = $('#configId').val();
+        const data = {
+            name: $('#configName').val(),
+            description: $('#configDescription').val(),
+            vault_url: $('#configVaultUrl').val(),
+            export_method: $('#configExportMethod').val(),
+            sharepoint_site: $('#configSpSite').val(),
+            sharepoint_folder: $('#configSpFolder').val(),
+            custom_api_url: $('#configCustomApiUrl').val(),
+            default_jql: $('#configDefaultJql').val(),
+            parallelism: parseInt($('#configParallelism').val()) || 5,
+            is_default: $('#configIsDefault').is(':checked')
+        };
+        
+        const method = configId ? 'PUT' : 'POST';
+        const url = configId ? `/api/configurations/${configId}` : '/api/configurations/';
+        
+        $.ajax({
+            url: url,
+            method: method,
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                configModal.hide();
+                loadConfigs();
+            },
+            error: function(xhr) {
+                alert('Failed to save: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+
+    function editConfig(id) {
+        showConfigModal(id);
+    }
+
+    function useConfig(id) {
+        window.location.href = `/migrate?config=${id}`;
+    }
+
+    function deleteConfig(id) {
+        if (!confirm('Delete this configuration?')) return;
+        
+        $.ajax({
+            url: `/api/configurations/${id}`,
+            method: 'DELETE',
+            success: function() {
+                loadConfigs();
+            },
+            error: function(xhr) {
+                alert('Failed to delete: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+
+    function showCertModal() {
+        $('#certForm')[0].reset();
+        certModal.show();
+    }
+
+    function uploadCert() {
+        const formData = new FormData();
+        formData.append('name', $('#certName').val());
+        formData.append('cert_type', $('#certType').val());
+        formData.append('file', $('#certFile')[0].files[0]);
+        formData.append('description', $('#certDescription').val());
+        formData.append('client_id', $('#certClientId').val());
+        formData.append('tenant_id', $('#certTenantId').val());
+        
+        $.ajax({
+            url: '/api/configurations/certificates/upload',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function() {
+                certModal.hide();
+                loadCerts();
+            },
+            error: function(xhr) {
+                alert('Failed to upload: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+
+    function activateCert(id) {
+        $.ajax({
+            url: `/api/configurations/certificates/${id}/activate`,
+            method: 'PUT',
+            success: function() {
+                loadCerts();
+            },
+            error: function(xhr) {
+                alert('Failed to activate: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+
+    function deleteCert(id) {
+        if (!confirm('Delete this certificate?')) return;
+        
+        $.ajax({
+            url: `/api/configurations/certificates/${id}`,
+            method: 'DELETE',
+            success: function() {
+                loadCerts();
+            },
+            error: function(xhr) {
+                alert('Failed to delete: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+
+    function checkServices() {
+        // Check health endpoint
+        $.get('/health', function(data) {
+            // Services are running
+        }).fail(function() {
+            console.log('Health check failed');
+        });
+    }
+
+    function checkAuthStatus() {
+        $.get('/auth/status', function(data) {
+            if (data.configured) {
+                $('#authStatus').html('<span class="badge bg-success">Configured</span>');
+                const methodLabel = data.auth_method === 'certificate' 
+                    ? '<code>Certificate</code> <i class="bi bi-shield-check text-success"></i>'
+                    : '<code>Client Secret</code>';
+                $('#authMethod').html(methodLabel);
+            } else {
+                $('#authStatus').html('<span class="badge bg-warning">Not Configured</span>');
+                $('#authMethod').html('<code>None</code>');
+            }
+        }).fail(function() {
+            $('#authStatus').html('<span class="badge bg-secondary">Unknown</span>');
+        });
+    }
+
+    // ========== Environment Variables Functions ==========
+    
+    function loadEnvVars() {
+        $.get('/api/settings/env', function(data) {
+            allEnvVars = data.environment_variables || [];
+            renderEnvVars(filterEnvVarsList(allEnvVars));
+        }).fail(function() {
+            $('#envVarsList').html('<div class="text-center text-danger py-4">Failed to load environment variables</div>');
+        });
+    }
+
+    function filterEnvVarsList(vars) {
+        if (!currentFilter) return vars;
+        return vars.filter(v => v.category === currentFilter);
+    }
+
+    function filterEnvVars(category) {
+        currentFilter = category;
+        
+        // Update button states
+        $('.btn-group .btn').removeClass('active');
+        $(`#filter-${category || 'all'}`).addClass('active');
+        
+        renderEnvVars(filterEnvVarsList(allEnvVars));
+    }
+
+    function renderEnvVars(vars) {
+        if (!vars || vars.length === 0) {
+            $('#envVarsList').html('<div class="text-center text-muted py-4">No environment variables found</div>');
+            return;
+        }
+
+        let html = '<div class="table-responsive"><table class="table table-hover align-middle">';
+        html += '<thead><tr><th>Variable</th><th>Value</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+
+        vars.forEach(v => {
+            const categoryBadge = getCategoryBadge(v.category);
+            const statusBadge = v.has_value 
+                ? '<span class="badge bg-success">Set</span>' 
+                : (v.is_required ? '<span class="badge bg-danger">Required</span>' : '<span class="badge bg-secondary">Not Set</span>');
+            const value = v.is_secret 
+                ? (v.has_value ? '••••••••' : '<span class="text-muted">-</span>')
+                : (v.value ? `<code>${truncate(v.value, 30)}</code>` : '<span class="text-muted">-</span>');
+
+            html += `
+                <tr>
+                    <td>
+                        <strong>${v.key}</strong>
+                        ${v.is_secret ? '<i class="bi bi-lock text-warning ms-1" title="Encrypted"></i>' : ''}
+                        ${v.description ? `<br><small class="text-muted">${v.description}</small>` : ''}
+                    </td>
+                    <td>${value}</td>
+                    <td>${categoryBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editEnvVar('${v.key}')" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        $('#envVarsList').html(html);
+    }
+
+    function getCategoryBadge(category) {
+        const colors = {
+            'jira': 'primary',
+            'sharepoint': 'info',
+            'azure': 'warning',
+            'email': 'secondary',
+            'api': 'success',
+            'general': 'dark'
+        };
+        return `<span class="badge bg-${colors[category] || 'secondary'}">${category}</span>`;
+    }
+
+    function showEnvModal(isNew = true) {
+        $('#envForm')[0].reset();
+        $('#envKey').val('');
+        $('#envIsNew').val(isNew ? '1' : '');
+        $('#envValue').attr('type', 'password');
+        $('#envValueToggle').removeClass('bi-eye-slash').addClass('bi-eye');
+        
+        if (isNew) {
+            $('#envModalTitle').text('Add Environment Variable');
+            $('#envKeyGroup').show();
+            $('#envNewFields').show();
+            $('#envSecretNote').hide();
+        } else {
+            $('#envKeyGroup').hide();
+            $('#envNewFields').hide();
+        }
+        
+        envModal.show();
+    }
+
+    function editEnvVar(key) {
+        const envVar = allEnvVars.find(v => v.key === key);
+        if (!envVar) return;
+
+        $('#envModalTitle').text(`Edit: ${key}`);
+        $('#envKey').val(key);
+        $('#envIsNew').val('');
+        $('#envKeyGroup').hide();
+        $('#envNewFields').hide();
+        $('#envValue').val('');
+        $('#envDescription').val(envVar.description || '');
+        
+        if (envVar.is_secret) {
+            $('#envSecretNote').show();
+            $('#envValue').attr('placeholder', 'Enter new value (leave empty to keep current)');
+        } else {
+            $('#envSecretNote').hide();
+            $('#envValue').attr('placeholder', 'Enter value');
+        }
+        
+        envModal.show();
+    }
+
+    function toggleEnvValue() {
+        const input = $('#envValue');
+        const icon = $('#envValueToggle');
+        
+        if (input.attr('type') === 'password') {
+            input.attr('type', 'text');
+            icon.removeClass('bi-eye').addClass('bi-eye-slash');
+        } else {
+            input.attr('type', 'password');
+            icon.removeClass('bi-eye-slash').addClass('bi-eye');
+        }
+    }
+
+    function saveEnvVar() {
+        const isNew = $('#envIsNew').val() === '1';
+        const key = isNew ? $('#envKeyInput').val() : $('#envKey').val();
+        const value = $('#envValue').val();
+        const description = $('#envDescription').val();
+
+        if (!key) {
+            alert('Variable name is required');
+            return;
+        }
+
+        if (isNew) {
+            // Create new variable
+            const data = {
+                key: key,
+                value: value,
+                description: description,
+                category: $('#envCategory').val(),
+                is_secret: $('#envIsSecret').is(':checked')
+            };
+
+            $.ajax({
+                url: '/api/settings/env',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function() {
+                    envModal.hide();
+                    loadEnvVars();
+                },
+                error: function(xhr) {
+                    alert('Failed to create: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+                }
+            });
+        } else {
+            // Update existing variable
+            const data = { description: description };
+            if (value) {
+                data.value = value;
+            }
+
+            $.ajax({
+                url: `/api/settings/env/${key}`,
+                method: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function() {
+                    envModal.hide();
+                    loadEnvVars();
+                },
+                error: function(xhr) {
+                    alert('Failed to update: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+                }
+            });
+        }
+    }
+
+    function exportEnvVars() {
+        $.get('/api/settings/env/export', function(data) {
+            const blob = new Blob([data.content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '.env.export';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+    }
+
+    function truncate(str, len) {
+        if (!str) return '';
+        return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+</script>
+{% endblock %}

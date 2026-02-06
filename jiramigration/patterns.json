@@ -1,0 +1,14 @@
+{
+  "_comment": "SpaCy Matcher patterns for extracting identifiers from Jira issue text. Each pattern is a list of token matchers. Customize these patterns to match your organization's identifier formats. See https://spacy.io/usage/rule-based-matching for pattern syntax.",
+  "patterns": [
+    [
+      {"TEXT": {"REGEX": "[A-Za-z]{2,8}\\d{4,12}"}}
+    ],
+    [
+      {"ORTH": {"REGEX": "[A-Za-z]{2,8}\\d{4,12}"}}
+    ],
+    [
+      {"TEXT": {"REGEX": "[A-Za-z0-9]{8,20}"}}
+    ]
+  ]
+}

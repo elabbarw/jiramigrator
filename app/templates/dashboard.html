@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Jira Migration{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="text-muted mb-0">Overview of your Jira migration activities</p>
+    </div>
+    <a href="/migrate" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Migration
+    </a>
+</div>
+
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
+                    <i class="bi bi-list-task"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="totalJobs">-</div>
+                    <div class="stat-label">Total Jobs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="completedJobs">-</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="runningJobs">-</div>
+                    <div class="stat-label">Running</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-info bg-opacity-10 text-info me-3">
+                    <i class="bi bi-file-earmark-text"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="totalIssues">-</div>
+                    <div class="stat-label">Issues Migrated</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts and Recent Jobs -->
+<div class="row g-4">
+    <!-- Success Rate Card -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Success Rate</h5>
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div class="position-relative" style="width: 150px; height: 150px;">
+                    <svg viewBox="0 0 36 36" class="w-100 h-100">
+                        <path
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#e9ecef"
+                            stroke-width="3"
+                        />
+                        <path
+                            id="successRateCircle"
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#198754"
+                            stroke-width="3"
+                            stroke-dasharray="0, 100"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                    <div class="position-absolute top-50 start-50 translate-middle text-center">
+                        <span class="fs-2 fw-bold" id="successRateValue">-</span>
+                        <span class="fs-5">%</span>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <small class="text-muted">Jobs completed successfully</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Methods Breakdown -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Export Methods</h5>
+            </div>
+            <div class="card-body">
+                <div id="exportMethodsChart">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-pie-chart" style="font-size: 3rem;"></i>
+                        <p class="mt-2">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/migrate" class="btn btn-outline-primary text-start">
+                        <i class="bi bi-upload me-2"></i> Start New Migration
+                    </a>
+                    <a href="/jobs" class="btn btn-outline-secondary text-start">
+                        <i class="bi bi-list-task me-2"></i> View All Jobs
+                    </a>
+                    <a href="/settings" class="btn btn-outline-secondary text-start">
+                        <i class="bi bi-gear me-2"></i> Manage Settings
+                    </a>
+                    <button class="btn btn-outline-info text-start" onclick="refreshStats()">
+                        <i class="bi bi-arrow-clockwise me-2"></i> Refresh Stats
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Jobs Table -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Recent Jobs</h5>
+                <a href="/jobs" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Status</th>
+                                <th>Export Method</th>
+                                <th>Issues</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentJobsTable">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let ws;
+
+    $(document).ready(function() {
+        loadStats();
+        connectWebSocket();
+    });
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'job_update') {
+                // Refresh stats when a job updates
+                loadStats();
+            }
+        };
+        
+        ws.onclose = function() {
+            // Reconnect after 3 seconds
+            setTimeout(connectWebSocket, 3000);
+        };
+    }
+
+    function loadStats() {
+        $.get('/api/jobs/stats', function(data) {
+            // Update stat cards
+            $('#totalJobs').text(data.jobs.total);
+            $('#completedJobs').text(data.jobs.completed);
+            $('#runningJobs').text(data.jobs.running);
+            $('#totalIssues').text(data.issues.total.toLocaleString());
+            
+            // Update success rate circle
+            const rate = data.jobs.success_rate;
+            $('#successRateValue').text(rate);
+            $('#successRateCircle').attr('stroke-dasharray', `${rate}, 100`);
+            
+            // Update export methods
+            renderExportMethods(data.by_export_method);
+            
+            // Update recent jobs
+            renderRecentJobs(data.recent_jobs);
+        }).fail(function() {
+            // Handle no data case
+            $('#totalJobs').text('0');
+            $('#completedJobs').text('0');
+            $('#runningJobs').text('0');
+            $('#totalIssues').text('0');
+            $('#successRateValue').text('0');
+            $('#recentJobsTable').html('<tr><td colspan="6" class="text-center text-muted py-4">No jobs found. Start a new migration!</td></tr>');
+        });
+    }
+
+    function renderExportMethods(methods) {
+        const colors = {
+            'sharepoint': '#0d6efd',
+            'api': '#198754'
+        };
+        
+        const total = Object.values(methods).reduce((a, b) => a + b, 0);
+        
+        if (total === 0) {
+            $('#exportMethodsChart').html(`
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                    <p class="mt-2 mb-0">No data yet</p>
+                </div>
+            `);
+            return;
+        }
+        
+        let html = '<div class="d-flex flex-column gap-3">';
+        for (const [method, count] of Object.entries(methods)) {
+            const percent = Math.round(count / total * 100);
+            const color = colors[method] || '#6c757d';
+            html += `
+                <div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-capitalize">${method}</span>
+                        <span class="text-muted">${count} (${percent}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar" style="width: ${percent}%; background-color: ${color};"></div>
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        $('#exportMethodsChart').html(html);
+    }
+
+    function renderRecentJobs(jobs) {
+        if (!jobs || jobs.length === 0) {
+            $('#recentJobsTable').html('<tr><td colspan="6" class="text-center text-muted py-4">No jobs found. Start a new migration!</td></tr>');
+            return;
+        }
+        
+        let html = '';
+        jobs.forEach(job => {
+            const statusBadge = getStatusBadge(job.status);
+            const created = new Date(job.created_at).toLocaleString();
+            const issues = `${job.successful_issues}/${job.total_issues}`;
+            
+            html += `
+                <tr>
+                    <td><a href="/jobs/${job.id}">#${job.id}</a></td>
+                    <td>${statusBadge}</td>
+                    <td><span class="text-capitalize">${job.export_method}</span></td>
+                    <td>${issues}</td>
+                    <td><small>${created}</small></td>
+                    <td>
+                        <a href="/jobs/${job.id}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+            `;
+        });
+        $('#recentJobsTable').html(html);
+    }
+
+    function getStatusBadge(status) {
+        const badges = {
+            'pending': '<span class="badge bg-secondary">Pending</span>',
+            'started': '<span class="badge bg-primary">Started</span>',
+            'running': '<span class="badge bg-info">Running</span>',
+            'completed': '<span class="badge bg-success">Completed</span>',
+            'failed': '<span class="badge bg-danger">Failed</span>'
+        };
+        return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+    }
+
+    function refreshStats() {
+        loadStats();
+    }
+</script>
+{% endblock %}

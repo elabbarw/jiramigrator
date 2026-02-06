@@ -1,0 +1,43 @@
+# Core dependencies
+atlassian-python-api
+pdfkit
+Office365-REST-Python-Client
+python-dotenv
+spacy
+mistune
+tenacity
+tqdm
+
+# Web Framework
+fastapi
+uvicorn
+jinja2
+aiofiles
+python-multipart
+email-validator
+
+# Database
+sqlalchemy
+alembic
+
+# Task Queue
+celery
+redis
+flower
+
+# WebSocket support
+websockets
+
+# Additional utilities
+pydantic
+pydantic-settings
+
+# Security
+python-jose
+passlib
+bcrypt
+cryptography
+
+# Microsoft Authentication (Entra ID)
+msal
+requests

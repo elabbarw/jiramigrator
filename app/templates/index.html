@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}New Migration - Jira Migration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>New Migration</h1>
+    <p class="text-muted mb-0">Migrate Jira issues to SharePoint or API endpoints</p>
+</div>
+
+<div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Migration Form</h5>
+                    </div>
+                    <div class="card-body">
+                                <form id="migrationForm" method="post">
+                                    <div class="mb-3">
+                                        <label for="vault_url" class="form-label">Vault URL</label>
+                                        <input type="url" class="form-control" id="vault_url" name="vault_url" required>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label for="vault_name" class="form-label">Vault Username</label>
+                                            <input type="text" class="form-control" id="vault_name" name="vault_name" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="vault_token" class="form-label">Vault Token/Password</label>
+                                            <input type="password" class="form-control" id="vault_token" name="vault_token" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="export_method" class="form-label">Export Method</label>
+                                        <select class="form-select" id="export_method" name="export_method" required>
+                                            <option value="sharepoint">SharePoint</option>
+                                            <option value="api">API</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- SharePoint options -->
+                                    <div id="sharepointOptions">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="sharepoint_site" class="form-label">SharePoint Site</label>
+                                                <input type="text" class="form-control" id="sharepoint_site" name="sharepoint_site">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="sharepoint_folder" class="form-label">SharePoint Folder</label>
+                                                <input type="text" class="form-control" id="sharepoint_folder" name="sharepoint_folder">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- API options -->
+                                    <div id="apiOptions" style="display: none;">
+                                        <div class="mb-3">
+                                            <label for="custom_api_url" class="form-label">Custom API URL</label>
+                                            <input type="url" class="form-control" id="custom_api_url" name="custom_api_url">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Issue Selection Method</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="issueSelection" id="jqlOption" value="jql" checked>
+                                            <label class="form-check-label" for="jqlOption">
+                                                JQL Query
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="issueSelection" id="projectOption" value="project">
+                                            <label class="form-check-label" for="projectOption">
+                                                Project Key
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="issueSelection" id="csvOption" value="csv">
+                                            <label class="form-check-label" for="csvOption">
+                                                CSV Data
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- JQL option -->
+                                    <div id="jqlFields" class="mb-3">
+                                        <label for="jql" class="form-label">JQL Query</label>
+                                        <textarea class="form-control" id="jql" name="jql" rows="2"></textarea>
+                                    </div>
+                                    
+                                    <!-- Project option -->
+                                    <div id="projectFields" class="mb-3" style="display: none;">
+                                        <label for="project_key" class="form-label">Project Key</label>
+                                        <input type="text" class="form-control" id="project_key" name="project_key">
+                                    </div>
+                                    
+                                    <!-- CSV option -->
+                                    <div id="csvFields" class="mb-3" style="display: none;">
+                                        <label class="form-label">Upload CSV file</label>
+                                        <input class="form-control mb-2" type="file" id="csvFile" accept=".csv">
+                                        <div class="form-text mb-2">CSV must contain a 'key' column (or similar) with Jira issue keys.</div>
+                                        <p id="csvKeysStatus" class="mb-0 mt-2 fw-medium" style="display: none;"><span id="csvKeysCount">0</span> key(s) found</p>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="parallelism" class="form-label">Parallelism</label>
+                                        <input type="number" class="form-control" id="parallelism" name="parallelism" min="1" max="50" value="5">
+                                        <div class="form-text">Number of parallel tasks (1-50)</div>
+                                    </div>
+                                    
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="send_email" name="send_email">
+                                        <label class="form-check-label" for="send_email">Send email report when done</label>
+                                    </div>
+                                    
+                                    <div id="emailField" class="mb-3" style="display: none;">
+                                        <label for="email" class="form-label">Email Address</label>
+                                        <input type="email" class="form-control" id="email" name="email">
+                                    </div>
+                                    
+                                    <!-- Advanced Options Section -->
+                                    <div class="accordion mb-3" id="advancedOptionsAccordion">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="headingAdvanced">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdvanced" aria-expanded="false" aria-controls="collapseAdvanced">
+                                                    Advanced Options
+                                                </button>
+                                            </h2>
+                                            <div id="collapseAdvanced" class="accordion-collapse collapse" aria-labelledby="headingAdvanced" data-bs-parent="#advancedOptionsAccordion">
+                                                <div class="accordion-body">
+                                                    <h6>Custom Fields Options</h6>
+                                                    
+                                                    <div class="mb-3 form-check">
+                                                        <input type="checkbox" class="form-check-input" id="analyze_fields" name="analyze_fields" checked>
+                                                        <label class="form-check-label" for="analyze_fields">Analyze fields</label>
+                                                        <div class="form-text">Enable field analysis for token extraction</div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3 form-check">
+                                                        <input type="checkbox" class="form-check-input" id="show_all_fields" name="show_all_fields">
+                                                        <label class="form-check-label" for="show_all_fields">Show all fields</label>
+                                                        <div class="form-text">Include all fields in the output</div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3 form-check">
+                                                        <input type="checkbox" class="form-check-input" id="use_view_screen" name="use_view_screen" checked>
+                                                        <label class="form-check-label" for="use_view_screen">Use view screen</label>
+                                                        <div class="form-text">Use view screens for field visibility</div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label for="identifier_field_terms" class="form-label">Identifier Field Terms</label>
+                                                        <input type="text" class="form-control" id="identifier_field_terms" name="identifier_field_terms" value="identifier, id, reference, account">
+                                                        <div class="form-text">Comma-separated terms to identify fields containing extractable identifiers</div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label for="important_field_terms" class="form-label">Important Field Terms</label>
+                                                        <input type="text" class="form-control" id="important_field_terms" name="important_field_terms" value="type, priority, label, epic, parent, link, domain, benefit, customer, capex, opex, team, business, value">
+                                                        <div class="form-text">Comma-separated terms to identify important fields</div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3 form-check">
+                                                        <input type="checkbox" class="form-check-input" id="include_manual_fields" name="include_manual_fields">
+                                                        <label class="form-check-label" for="include_manual_fields">Include manual fields</label>
+                                                        <div class="form-text">Manually specify fields to include</div>
+                                                    </div>
+                                                    
+                                                    <div id="manualFieldsSection" class="mb-3" style="display: none;">
+                                                        <label for="manual_fields" class="form-label">Manual Fields</label>
+                                                        <textarea class="form-control" id="manual_fields" name="manual_fields" rows="3" placeholder="Field1&#10;Field2&#10;Field3"></textarea>
+                                                        <div class="form-text">Enter one field display name per line</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">Submit Migration</button>
+                                </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Modal -->
+        <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="statusModalLabel">Migration Job Status</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Job ID:</label>
+                            <div id="jobId" class="fw-bold"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status:</label>
+                            <div id="jobStatus" class="fw-bold"></div>
+                        </div>
+                        <div class="mb-3" id="resultSection" style="display: none;">
+                            <label class="form-label">Result:</label>
+                            <pre id="jobResult" class="border p-2 bg-light"></pre>
+                        </div>
+                        <div class="mb-3" id="errorSection" style="display: none;">
+                            <label class="form-label">Error:</label>
+                            <pre id="jobError" class="border p-2 bg-light text-danger"></pre>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <a id="statusPageLink" class="btn btn-primary" target="_blank">View Status Page</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/app.js"></script>
+<script>
+// Vanilla JS fallback in case jQuery fails to load or app.js fails to bind handlers.
+// Defer so this runs after $(document).ready() in app.js; otherwise both handlers attach and the job is submitted twice.
+(function() {
+    function runFallback() {
+        // Check if the jQuery submit handler was successfully bound (flag set in app.js)
+        if (window._migrationFormReady) return;
+        
+        console.warn('jQuery migration handler not ready, using vanilla JS fallback');
+        
+        // Radio toggle fallback
+        function syncRadioFields() {
+            var radios = document.querySelectorAll('input[name="issueSelection"]');
+            var fields = {jql: 'jqlFields', project: 'projectFields', csv: 'csvFields'};
+            var selected = document.querySelector('input[name="issueSelection"]:checked');
+            var val = selected ? selected.value : 'jql';
+            
+            Object.keys(fields).forEach(function(key) {
+                var el = document.getElementById(fields[key]);
+                if (el) el.style.display = (key === val) ? '' : 'none';
+            });
+        }
+        
+        document.querySelectorAll('input[name="issueSelection"]').forEach(function(radio) {
+            radio.addEventListener('change', syncRadioFields);
+        });
+        syncRadioFields();
+        
+        // Email toggle fallback
+        var emailCb = document.getElementById('send_email');
+        if (emailCb) {
+            emailCb.addEventListener('change', function() {
+                var emailField = document.getElementById('emailField');
+                if (emailField) emailField.style.display = this.checked ? '' : 'none';
+            });
+        }
+        
+        // Form submit fallback (single-submit guard)
+        var form = document.getElementById('migrationForm');
+        var fallbackSubmitting = false;
+        if (form) {
+            form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (fallbackSubmitting) return;
+            fallbackSubmitting = true;
+            var btn = form.querySelector('button[type="submit"]');
+            var origText = btn.textContent;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
+            btn.disabled = true;
+            
+            // Gather form data
+            var data = {
+                vault_url: (document.getElementById('vault_url') || {}).value || '',
+                vault_name: (document.getElementById('vault_name') || {}).value || '',
+                vault_token: (document.getElementById('vault_token') || {}).value || '',
+                export_method: (document.getElementById('export_method') || {}).value || 'sharepoint',
+                parallelism: parseInt((document.getElementById('parallelism') || {}).value) || 5
+            };
+            
+            if (data.export_method === 'sharepoint') {
+                data.sharepoint_site = (document.getElementById('sharepoint_site') || {}).value || '';
+                data.sharepoint_folder = (document.getElementById('sharepoint_folder') || {}).value || '';
+            }
+            
+            var jqlOpt = document.getElementById('jqlOption');
+            var projectOpt = document.getElementById('projectOption');
+            var csvOpt = document.getElementById('csvOption');
+            if (jqlOpt && jqlOpt.checked) data.jql = ((document.getElementById('jql') || {}).value || '').trim();
+            if (projectOpt && projectOpt.checked) data.project_key = ((document.getElementById('project_key') || {}).value || '').trim();
+            if (csvOpt && csvOpt.checked) {
+                data.csv_data = window._csvUploadedIssues || [];
+            }
+            if (csvOpt && csvOpt.checked && (!data.csv_data || data.csv_data.length === 0)) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                fallbackSubmitting = false;
+                alert('Please upload a CSV file first.');
+                return;
+            }
+            if (projectOpt && projectOpt.checked && !data.project_key) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                fallbackSubmitting = false;
+                alert('Please enter a project key.');
+                return;
+            }
+            if (jqlOpt && jqlOpt.checked && !data.jql) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                fallbackSubmitting = false;
+                alert('Please enter a JQL query.');
+                return;
+            }
+            fetch('/api/migration/submit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(resp) {
+                if (!resp.ok) throw resp;
+                return resp.json();
+            }).then(function(result) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                fallbackSubmitting = false;
+                window.location.href = '/jobs/' + result.db_job_id;
+            }).catch(function(err) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                fallbackSubmitting = false;
+                if (err.json) {
+                    err.json().then(function(d) { alert('Error: ' + (d.detail || 'Unknown error')); });
+                } else {
+                    alert('Error: ' + (err.message || 'Unknown error'));
+                }
+            });
+        });
+        }
+    }
+    // Run fallback after $(document).ready() so app.js has a chance to set _migrationFormReady first
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(runFallback, 0); });
+    } else {
+        setTimeout(runFallback, 0);
+    }
+})();
+</script>
+{% endblock %} 

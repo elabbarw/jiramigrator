@@ -1,0 +1,137 @@
+# ===========================================
+# Jira Migration App - Docker Compose
+# ===========================================
+#
+# CUSTOMIZATION INSTRUCTIONS:
+# 1. Copy .env.example to .env and fill in your values
+# 2. Place SSL certificates in ./certs/ (server.crt, server.key)
+# 3. Place Azure AD certificates in ./certs/ (certificate.crt, certificate.pem)
+# 4. Update the domain below if not using jiramigration.localhost
+#
+# To change the domain, search and replace "jiramigration.localhost" with your domain
+
+services:
+  # Traefik reverse proxy for SSL termination
+  traefik:
+    image: traefik:v3.0
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./certs:/certs:ro  # Mount your SSL certificates here
+    restart: unless-stopped
+
+  # FastAPI backend
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./certs/certificate.crt:/app/certs/certificate.crt  # Azure AD certificate
+      - ./certs/certificate.pem:/app/certs/certificate.pem  # Azure AD private key
+      - app_data:/app/data
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./data/jira_migration.db
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      # CUSTOMIZE: Change jiramigration.localhost to your domain
+      - "traefik.http.routers.web.rule=Host(`jiramigration.localhost`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls=true"
+      - "traefik.http.services.web.loadbalancer.server.port=8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for Celery broker/backend
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Celery worker for background task processing
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - .:/app
+      - ./certs/certificate.crt:/app/certs/certificate.crt  # Azure AD certificate
+      - ./certs/certificate.pem:/app/certs/certificate.pem  # Azure AD private key
+      - app_data:/app/data
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./data/jira_migration.db
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - web
+    command: celery -A app.celery.celery_app worker --loglevel=info --concurrency=4
+    restart: unless-stopped
+
+  # Celery beat for scheduled tasks (optional - can be removed if not needed)
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - .:/app
+      - app_data:/app/data
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./data/jira_migration.db
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - worker
+    command: celery -A app.celery.celery_app beat --loglevel=info
+    restart: unless-stopped
+
+  # Flower for monitoring Celery tasks (optional - access at http://localhost:5555)
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - worker
+    command: celery -A app.celery.celery_app flower --port=5555
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  app_data:

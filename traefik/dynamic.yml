@@ -1,0 +1,25 @@
+# Traefik Dynamic Configuration - TLS Certificates
+# ================================================
+#
+# IMPORTANT: You must provide your own SSL certificates!
+#
+# Place your certificate files in the ./certs/ directory:
+#   - server.crt  (your SSL certificate)
+#   - server.key  (your private key)
+#
+# For local development, you can generate self-signed certificates:
+#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#     -keyout certs/server.key -out certs/server.crt \
+#     -subj "/CN=jiramigration.localhost"
+#
+# For production, use certificates from a trusted CA (e.g., Let's Encrypt)
+
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/server.crt
+        keyFile: /certs/server.key
+  certificates:
+    - certFile: /certs/server.crt
+      keyFile: /certs/server.key

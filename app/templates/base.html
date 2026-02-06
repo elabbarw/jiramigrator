@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Jira Migration{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="icon" type="image/png" href="/static/jiramigrator.png">
+    {% block extra_css %}{% endblock %}
+    <style>
+        :root {
+            --sidebar-width: 250px;
+        }
+        body {
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            min-height: 100vh;
+            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0.75rem;
+            transition: all 0.2s;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background: rgba(13, 110, 253, 0.8);
+        }
+        .sidebar .nav-link i {
+            margin-right: 0.75rem;
+            width: 20px;
+            text-align: center;
+        }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .brand-logo {
+            padding: 1.25rem 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 1rem;
+        }
+        .brand-mascot {
+            width: 180px;
+            height: auto;
+            object-fit: contain;
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .brand-logo h4 {
+            color: #fff;
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        .brand-logo small {
+            color: rgba(255,255,255,0.6);
+        }
+        .stat-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        .stat-card .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        .stat-card .stat-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        .page-header {
+            margin-bottom: 2rem;
+        }
+        .page-header h1 {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        @media (max-width: 991.98px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar d-flex flex-column">
+        <div class="brand-logo">
+            <img src="/static/jiramigrator.png" alt="Jira Migrator" class="brand-mascot">
+            <h4>JiraMigrator</h4>
+            <small>v2.0.0</small>
+        </div>
+        <ul class="nav flex-column flex-grow-1">
+            <li class="nav-item">
+                <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.url.path == '/migrate' %}active{% endif %}" href="/migrate">
+                    <i class="bi bi-upload"></i> New Migration
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if '/jobs' in request.url.path %}active{% endif %}" href="/jobs">
+                    <i class="bi bi-list-task"></i> Jobs
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}" href="/settings">
+                    <i class="bi bi-gear"></i> Settings
+                </a>
+            </li>
+        </ul>
+        {% if auth_enabled %}
+        <div class="mt-auto p-3 border-top border-secondary">
+            <div class="d-flex align-items-center text-white-50 mb-2">
+                <i class="bi bi-person-circle me-2"></i>
+                <small id="userName" class="text-truncate">Loading...</small>
+            </div>
+            <a href="/auth/logout" class="btn btn-outline-light btn-sm w-100">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+        </div>
+        {% endif %}
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Mobile menu toggle -->
+        <button class="btn btn-dark d-lg-none mb-3" type="button" onclick="document.querySelector('.sidebar').classList.toggle('show')">
+            <i class="bi bi-list"></i> Menu
+        </button>
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/static/js/jquery-3.6.0.min.js"><\/script>')</script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toast Notification System
+        (function() {
+            let toastCounter = 0;
+            
+            // Toast type configurations
+            const toastConfig = {
+                success: {
+                    icon: 'bi-check-circle-fill',
+                    bgClass: 'toast-success',
+                    title: 'Success'
+                },
+                error: {
+                    icon: 'bi-x-circle-fill',
+                    bgClass: 'toast-error',
+                    title: 'Error'
+                },
+                warning: {
+                    icon: 'bi-exclamation-triangle-fill',
+                    bgClass: 'toast-warning',
+                    title: 'Warning'
+                },
+                info: {
+                    icon: 'bi-info-circle-fill',
+                    bgClass: 'toast-info',
+                    title: 'Info'
+                }
+            };
+            
+            /**
+             * Show a toast notification
+             * @param {string} message - The message to display
+             * @param {string} type - Toast type: 'success', 'error', 'warning', 'info'
+             * @param {number} duration - Duration in milliseconds (default: 5000)
+             */
+            window.showToast = function(message, type = 'info', duration = 5000) {
+                const config = toastConfig[type] || toastConfig.info;
+                const toastId = `toast-${++toastCounter}`;
+                
+                const toastHtml = `
+                    <div id="${toastId}" class="toast ${config.bgClass}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="${duration}">
+                        <div class="toast-header">
+                            <i class="bi ${config.icon} me-2"></i>
+                            <strong class="me-auto">${config.title}</strong>
+                            <small>Just now</small>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                const container = document.getElementById('toastContainer');
+                container.insertAdjacentHTML('beforeend', toastHtml);
+                
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement);
+                
+                // Remove toast element after it's hidden
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    toastElement.remove();
+                });
+                
+                toast.show();
+                return toast;
+            };
+            
+            /**
+             * Show a success toast
+             * @param {string} message - The message to display
+             * @param {number} duration - Duration in milliseconds (default: 5000)
+             */
+            window.showSuccess = function(message, duration = 5000) {
+                return showToast(message, 'success', duration);
+            };
+            
+            /**
+             * Show an error toast
+             * @param {string} message - The message to display
+             * @param {number} duration - Duration in milliseconds (default: 7000)
+             */
+            window.showError = function(message, duration = 7000) {
+                return showToast(message, 'error', duration);
+            };
+            
+            /**
+             * Show a warning toast
+             * @param {string} message - The message to display
+             * @param {number} duration - Duration in milliseconds (default: 6000)
+             */
+            window.showWarning = function(message, duration = 6000) {
+                return showToast(message, 'warning', duration);
+            };
+            
+            /**
+             * Show an info toast
+             * @param {string} message - The message to display
+             * @param {number} duration - Duration in milliseconds (default: 5000)
+             */
+            window.showInfo = function(message, duration = 5000) {
+                return showToast(message, 'info', duration);
+            };
+        })();
+        
+        {% if auth_enabled %}
+        // Load current user info
+        $(document).ready(function() {
+            $.get('/auth/me', function(user) {
+                $('#userName').text(user.name || user.email || 'User');
+            }).fail(function() {
+                $('#userName').text('Guest');
+            });
+        });
+        {% endif %}
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

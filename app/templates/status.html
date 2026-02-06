@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Job Status - Jira Migration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/jobs">Jobs</a></li>
+            <li class="breadcrumb-item active">Job Status</li>
+        </ol>
+    </nav>
+    <h1>Migration Job Status</h1>
+    <p class="text-muted mb-0">Monitor the progress of your migration job</p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Job Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Job ID</label>
+                    <div id="jobId" class="fw-bold font-monospace">{{ job_id }}</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-muted">Status</label>
+                    <div id="jobStatus">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="ms-2">Loading...</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3" id="resultSection" style="display: none;">
+                    <label class="form-label text-muted">Result</label>
+                    <pre id="jobResult" class="border p-3 bg-light rounded"></pre>
+                </div>
+                
+                <div class="mb-3" id="errorSection" style="display: none;">
+                    <label class="form-label text-muted">Error</label>
+                    <pre id="jobError" class="border p-3 bg-light text-danger rounded"></pre>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="/jobs" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Jobs
+                    </a>
+                    <button type="button" class="btn btn-primary" id="refreshButton">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Status Legend</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-secondary me-2">PENDING</span>
+                    <small class="text-muted">Job is queued</small>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-primary me-2">STARTED</span>
+                    <small class="text-muted">Job is running</small>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-warning me-2">RETRY</span>
+                    <small class="text-muted">Job is retrying</small>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-success me-2">SUCCESS</span>
+                    <small class="text-muted">Job completed</small>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-danger me-2">FAILURE</span>
+                    <small class="text-muted">Job failed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        const jobId = $('#jobId').text().trim();
+        
+        // Function to fetch job status
+        function fetchJobStatus() {
+            $.ajax({
+                url: `/api/migration/status/${jobId}`,
+                method: 'GET',
+                success: function(response) {
+                    // Update status
+                    $('#jobStatus').html(`<span class="badge ${getStatusBadgeClass(response.status)} fs-6">${response.status}</span>`);
+                    
+                    // Update result or error if available
+                    if (response.result) {
+                        $('#resultSection').show();
+                        $('#jobResult').text(JSON.stringify(response.result, null, 2));
+                    } else {
+                        $('#resultSection').hide();
+                    }
+                    
+                    if (response.error) {
+                        $('#errorSection').show();
+                        $('#jobError').text(response.error);
+                    } else {
+                        $('#errorSection').hide();
+                    }
+                    
+                    // If job is not done, set up auto-refresh
+                    if (['PENDING', 'STARTED', 'RETRY'].includes(response.status)) {
+                        setTimeout(fetchJobStatus, 5000); // Refresh every 5 seconds
+                    }
+                },
+                error: function(xhr) {
+                    $('#jobStatus').html(`<span class="badge bg-danger fs-6">Error fetching status</span>`);
+                    $('#errorSection').show();
+                    $('#jobError').text(xhr.responseText || 'Failed to fetch job status');
+                }
+            });
+        }
+        
+        // Helper function to get appropriate badge class based on status
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'SUCCESS':
+                case 'completed':
+                    return 'bg-success';
+                case 'FAILURE':
+                case 'failed':
+                    return 'bg-danger';
+                case 'STARTED':
+                    return 'bg-primary';
+                case 'RETRY':
+                    return 'bg-warning';
+                case 'PENDING':
+                default:
+                    return 'bg-secondary';
+            }
+        }
+        
+        // Initial fetch
+        fetchJobStatus();
+        
+        // Manual refresh button
+        $('#refreshButton').click(function() {
+            fetchJobStatus();
+        });
+    });
+</script>
+{% endblock %}

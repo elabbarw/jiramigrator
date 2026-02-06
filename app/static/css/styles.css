@@ -1,0 +1,379 @@
+/* Custom styles for Jira Migration App v2.0 */
+
+:root {
+    --primary-color: #0d6efd;
+    --sidebar-bg: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+    --card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Card styles */
+.card {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 1.5rem;
+    transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+}
+
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    padding: 1rem 1.25rem;
+}
+
+.card-title {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+pre {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+
+/* Status badges */
+.badge {
+    font-size: 0.85rem;
+    padding: 0.4em 0.75em;
+    font-weight: 500;
+    border-radius: 0.5rem;
+}
+
+/* Form control focus */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.form-control,
+.form-select {
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.875rem;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background: #0b5ed7;
+    transform: translateY(-1px);
+}
+
+/* Table styling */
+.table {
+    font-size: 0.9rem;
+}
+
+.table th {
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.04);
+}
+
+/* Progress bars */
+.progress {
+    border-radius: 1rem;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    border-radius: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Tab styling */
+.nav-tabs {
+    border-bottom: 2px solid #e9ecef;
+}
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--primary-color);
+    border: none;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+    border: none;
+    border-bottom: 2px solid var(--primary-color);
+    margin-bottom: -2px;
+}
+
+/* Spinner styling */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.5rem;
+}
+
+/* Accordion styling */
+.accordion-item {
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 0.5rem !important;
+    overflow: hidden;
+}
+
+.accordion-button {
+    font-weight: 500;
+    background: #f8f9fa;
+}
+
+.accordion-button:not(.collapsed) {
+    background: linear-gradient(90deg, rgba(13, 110, 253, 0.08), transparent);
+    color: var(--primary-color);
+}
+
+/* Modal styling */
+.modal-content {
+    border: none;
+    border-radius: 1rem;
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+/* List group styling */
+.list-group-item {
+    border-left: none;
+    border-right: none;
+    padding: 1rem 0;
+}
+
+.list-group-item:first-child {
+    border-top: none;
+}
+
+/* Alert styling */
+.alert {
+    border-radius: 0.75rem;
+    border: none;
+}
+
+/* Code styling */
+code {
+    background: rgba(13, 110, 253, 0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.85em;
+    color: #d63384;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 0.5rem;
+}
+
+.breadcrumb-item a {
+    color: #6c757d;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: var(--primary-color);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Toast Notification Styles */
+.toast-container {
+    z-index: 1100;
+    max-width: 400px;
+}
+
+.toast {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.toast .toast-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 0.75rem 1rem;
+}
+
+.toast .toast-body {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+}
+
+/* Success Toast - Green */
+.toast-success {
+    background-color: #ffffff;
+    border-left: 4px solid #198754;
+}
+
+.toast-success .toast-header {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.toast-success .toast-header i {
+    color: #198754;
+}
+
+.toast-success .toast-body {
+    color: #155724;
+}
+
+/* Error Toast - Red */
+.toast-error {
+    background-color: #ffffff;
+    border-left: 4px solid #dc3545;
+}
+
+.toast-error .toast-header {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.toast-error .toast-header i {
+    color: #dc3545;
+}
+
+.toast-error .toast-body {
+    color: #721c24;
+}
+
+/* Warning Toast - Yellow/Orange */
+.toast-warning {
+    background-color: #ffffff;
+    border-left: 4px solid #ffc107;
+}
+
+.toast-warning .toast-header {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: #856404;
+}
+
+.toast-warning .toast-header i {
+    color: #ffc107;
+}
+
+.toast-warning .toast-body {
+    color: #856404;
+}
+
+/* Info Toast - Blue */
+.toast-info {
+    background-color: #ffffff;
+    border-left: 4px solid #0dcaf0;
+}
+
+.toast-info .toast-header {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0c5460;
+}
+
+.toast-info .toast-header i {
+    color: #0dcaf0;
+}
+
+.toast-info .toast-body {
+    color: #0c5460;
+}
+
+/* Toast responsive adjustments */
+@media (max-width: 576px) {
+    .toast-container {
+        max-width: calc(100vw - 2rem);
+        left: 1rem;
+        right: 1rem;
+    }
+    
+    .toast {
+        width: 100%;
+    }
+}

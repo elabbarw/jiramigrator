@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+
+{% block title %}Job #{{ job_id }} - Jira Migration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/jobs">Jobs</a></li>
+            <li class="breadcrumb-item active">Job #{{ job_id }}</li>
+        </ol>
+    </nav>
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>Job #{{ job_id }}</h1>
+        <div id="actionButtons">
+            <a href="/logs/{{ job_id }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-text"></i> View Logs
+            </a>
+            <button class="btn btn-outline-primary" onclick="refreshJob()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            <button class="btn btn-danger d-none" id="cancelBtn" onclick="cancelJob()">
+                <i class="bi bi-stop-fill"></i> Stop Job
+            </button>
+            <button class="btn btn-warning d-none" id="resumeBtn" onclick="resumeJob()">
+                <i class="bi bi-play-fill"></i> Resume Failed
+            </button>
+            <button class="btn btn-secondary d-none" id="restartBtn" onclick="restartJob()">
+                <i class="bi bi-arrow-repeat"></i> Restart
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Status Card -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Status</h5>
+            </div>
+            <div class="card-body text-center">
+                <div id="statusBadge" class="mb-3">
+                    <span class="badge bg-secondary fs-4 px-4 py-2">Loading...</span>
+                </div>
+                <div id="progressCircle" class="mb-3" style="display: none;">
+                    <div class="position-relative d-inline-block" style="width: 120px; height: 120px;">
+                        <svg viewBox="0 0 36 36" class="w-100 h-100">
+                            <path
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke="#e9ecef"
+                                stroke-width="3"
+                            />
+                            <path
+                                id="progressPath"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke="#0d6efd"
+                                stroke-width="3"
+                                stroke-dasharray="0, 100"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                        <div class="position-absolute top-50 start-50 translate-middle text-center">
+                            <span class="fs-4 fw-bold" id="progressValue">0</span>
+                            <span>%</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="currentIssue" class="text-muted" style="display: none;">
+                    Processing: <span id="currentIssueKey">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Stats -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Progress</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-sm-3">
+                        <div class="text-center">
+                            <div class="fs-2 fw-bold text-primary" id="totalIssues">-</div>
+                            <div class="text-muted small">Total Issues</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="text-center">
+                            <div class="fs-2 fw-bold text-info" id="processedIssues">-</div>
+                            <div class="text-muted small">Processed</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="text-center">
+                            <div class="fs-2 fw-bold text-success" id="successfulIssues">-</div>
+                            <div class="text-muted small">Successful</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="text-center">
+                            <div class="fs-2 fw-bold text-danger" id="failedIssues">-</div>
+                            <div class="text-muted small">Failed</div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="progress mb-2" style="height: 20px;">
+                    <div class="progress-bar bg-success" id="successBar" style="width: 0%"></div>
+                    <div class="progress-bar bg-danger" id="failedBar" style="width: 0%"></div>
+                    <div class="progress-bar bg-secondary" id="remainingBar" style="width: 100%"></div>
+                </div>
+                <div class="d-flex justify-content-between small text-muted">
+                    <span><i class="bi bi-circle-fill text-success"></i> Successful</span>
+                    <span><i class="bi bi-circle-fill text-danger"></i> Failed</span>
+                    <span><i class="bi bi-circle-fill text-secondary"></i> Remaining</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Details -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Job Configuration</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th width="35%">Vault URL</th>
+                            <td id="vaultUrl">-</td>
+                        </tr>
+                        <tr>
+                            <th>Export Method</th>
+                            <td id="exportMethod">-</td>
+                        </tr>
+                        <tr>
+                            <th>JQL Query</th>
+                            <td><code id="jqlQuery">-</code></td>
+                        </tr>
+                        <tr>
+                            <th>Project Key</th>
+                            <td id="projectKey">-</td>
+                        </tr>
+                        <tr id="sharepointRow" style="display: none;">
+                            <th>SharePoint</th>
+                            <td id="sharepointInfo">-</td>
+                        </tr>
+                        <tr id="apiRow" style="display: none;">
+                            <th>API Details</th>
+                            <td id="apiInfo">-</td>
+                        </tr>
+                        <tr>
+                            <th>Parallelism</th>
+                            <td id="parallelism">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timing -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="card-title mb-0">Timing</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th width="35%">Created</th>
+                            <td id="createdAt">-</td>
+                        </tr>
+                        <tr>
+                            <th>Started</th>
+                            <td id="startedAt">-</td>
+                        </tr>
+                        <tr>
+                            <th>Completed</th>
+                            <td id="completedAt">-</td>
+                        </tr>
+                        <tr>
+                            <th>Duration</th>
+                            <td id="duration">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Section -->
+    <div class="col-12" id="errorSection" style="display: none;">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-exclamation-triangle"></i> Error</h5>
+            </div>
+            <div class="card-body">
+                <pre id="errorMessage" class="text-danger mb-0"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed Issues Quick View -->
+    <div class="col-12" id="failedSection" style="display: none;">
+        <div class="card">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Failed Issues</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-warning" onclick="retryFailed()">
+                        <i class="bi bi-arrow-repeat"></i> Retry All Failed
+                    </button>
+                    <a href="/logs/{{ job_id }}?status=failed" class="btn btn-sm btn-outline-secondary">
+                        View All Logs
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Issue Key</th>
+                                <th>Error</th>
+                                <th>Retry</th>
+                            </tr>
+                        </thead>
+                        <tbody id="failedIssuesTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const jobId = {{ job_id }};
+    let ws;
+    let autoRefresh;
+
+    $(document).ready(function() {
+        loadJob();
+        connectWebSocket();
+    });
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/job/${jobId}`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        };
+        
+        ws.onclose = function() {
+            setTimeout(connectWebSocket, 3000);
+        };
+    }
+
+    function handleWebSocketMessage(data) {
+        if (data.type === 'progress') {
+            updateProgress(data.data);
+        } else if (data.type === 'status_change') {
+            loadJob();
+        } else if (data.type === 'issue_complete') {
+            updateIssueCounters(data.data);
+        }
+    }
+
+    function updateIssueCounters(data) {
+        // Increment processed count
+        let processed = parseInt($('#processedIssues').text()) || 0;
+        let total = parseInt($('#totalIssues').text()) || 0;
+        processed++;
+        $('#processedIssues').text(processed);
+
+        if (data.status === 'success') {
+            let successful = parseInt($('#successfulIssues').text()) || 0;
+            successful++;
+            $('#successfulIssues').text(successful);
+        } else if (data.status === 'failed') {
+            let failed = parseInt($('#failedIssues').text()) || 0;
+            failed++;
+            $('#failedIssues').text(failed);
+
+            // Add to failed issues table
+            addFailedIssueRow(data);
+        }
+
+        // Update progress bar (use total from DOM; if 0 or NaN, refresh from server on next tick)
+        const totalNum = parseInt($('#totalIssues').text(), 10);
+        if (totalNum > 0) {
+            let successful = parseInt($('#successfulIssues').text(), 10) || 0;
+            let failed = parseInt($('#failedIssues').text(), 10) || 0;
+            const successPercent = successful / totalNum * 100;
+            const failedPercent = failed / totalNum * 100;
+            const remainingPercent = Math.max(0, 100 - successPercent - failedPercent);
+            const progressPercent = processed / totalNum * 100;
+
+            $('#successBar').css('width', successPercent + '%');
+            $('#failedBar').css('width', failedPercent + '%');
+            $('#remainingBar').css('width', remainingPercent + '%');
+            $('#progressValue').text(Math.round(progressPercent));
+            $('#progressPath').attr('stroke-dasharray', progressPercent + ', 100');
+        } else {
+            loadJob();
+        }
+
+        // Update current issue being processed
+        if (data.issue_key) {
+            $('#currentIssueKey').text(data.issue_key);
+        }
+    }
+
+    function addFailedIssueRow(data) {
+        $('#failedSection').show();
+        const tbody = $('#failedIssuesTable');
+        // Count existing rows (excluding the "and X more" row)
+        const existingRows = tbody.find('tr').not('.more-row').length;
+
+        if (existingRows < 10) {
+            tbody.find('.more-row').remove();
+            tbody.append(`
+                <tr>
+                    <td><code>${data.issue_key}</code></td>
+                    <td><small class="text-danger">${truncate(data.error || 'Unknown error', 60)}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning" onclick="retryIssue('${data.issue_key}')">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </td>
+                </tr>
+            `);
+        }
+        // Update or add the "more" count
+        let failed = parseInt($('#failedIssues').text()) || 0;
+        if (failed > 10) {
+            tbody.find('.more-row').remove();
+            tbody.append(`<tr class="more-row"><td colspan="3" class="text-center text-muted">... and ${failed - 10} more</td></tr>`);
+        }
+    }
+
+    function loadJob() {
+        $.get(`/api/jobs/${jobId}`, function(job) {
+            renderJob(job);
+        }).fail(function() {
+            $('#statusBadge').html('<span class="badge bg-danger fs-4 px-4 py-2">Not Found</span>');
+        });
+        
+        // Load failed issues
+        $.get(`/api/jobs/${jobId}/logs/failed`, function(data) {
+            if (data.failed_count > 0) {
+                $('#failedSection').show();
+                renderFailedIssues(data.logs);
+            } else {
+                $('#failedSection').hide();
+            }
+        });
+    }
+
+    function renderJob(job) {
+        // Status badge
+        const statusBadge = getStatusBadge(job.status, true);
+        $('#statusBadge').html(statusBadge);
+        
+        // Show/hide action buttons based on status
+        if (job.status === 'pending' || job.status === 'started' || job.status === 'running') {
+            // Show cancel button for running jobs
+            $('#cancelBtn').removeClass('d-none');
+            $('#restartBtn').addClass('d-none');
+            $('#resumeBtn').addClass('d-none');
+        } else if (job.status === 'failed' || job.status === 'completed' || job.status === 'cancelled') {
+            // Show restart/resume for finished jobs
+            $('#cancelBtn').addClass('d-none');
+            $('#restartBtn').removeClass('d-none');
+            // Show resume if there are failed issues OR unprocessed issues
+            const hasFailedIssues = job.failed_issues > 0;
+            const hasUnprocessedIssues = job.total_issues > 0 && job.processed_issues < job.total_issues;
+            if (hasFailedIssues || hasUnprocessedIssues) {
+                $('#resumeBtn').removeClass('d-none');
+                // Update button text to reflect what will be resumed
+                let resumeText = '<i class="bi bi-play-fill"></i> Resume';
+                if (hasFailedIssues && hasUnprocessedIssues) {
+                    resumeText += ` (${job.failed_issues} failed + ${job.total_issues - job.processed_issues} pending)`;
+                } else if (hasFailedIssues) {
+                    resumeText += ` (${job.failed_issues} failed)`;
+                } else if (hasUnprocessedIssues) {
+                    resumeText += ` (${job.total_issues - job.processed_issues} pending)`;
+                }
+                $('#resumeBtn').html(resumeText);
+            } else {
+                $('#resumeBtn').addClass('d-none');
+            }
+        } else {
+            $('#cancelBtn').addClass('d-none');
+            $('#restartBtn').addClass('d-none');
+            $('#resumeBtn').addClass('d-none');
+        }
+        
+        // Progress
+        const total = job.total_issues || 0;
+        const processed = job.processed_issues || 0;
+        const successful = job.successful_issues || 0;
+        const failed = job.failed_issues || 0;
+        
+        $('#totalIssues').text(total > 0 ? total : '-');
+        $('#processedIssues').text(processed);
+        $('#successfulIssues').text(successful);
+        $('#failedIssues').text(failed);
+        
+        const totalNum = Number(total) || 0;
+        const successPercent = totalNum > 0 ? (successful / totalNum * 100) : 0;
+        const failedPercent = totalNum > 0 ? (failed / totalNum * 100) : 0;
+        const remainingPercent = Math.max(0, 100 - successPercent - failedPercent);
+        const progressPercent = totalNum > 0 ? (processed / totalNum * 100) : 0;
+        
+        $('#successBar').css('width', successPercent + '%');
+        $('#failedBar').css('width', failedPercent + '%');
+        $('#remainingBar').css('width', remainingPercent + '%');
+        $('#progressValue').text(Math.round(progressPercent));
+        $('#progressPath').attr('stroke-dasharray', progressPercent + ', 100');
+        $('#progressCircle').show();
+        
+        // Show current issue for running jobs
+        if (job.status === 'running' || job.status === 'started') {
+            $('#currentIssue').show();
+            startAutoRefresh();
+        } else {
+            $('#currentIssue').hide();
+            stopAutoRefresh();
+        }
+        
+        // Configuration
+        $('#vaultUrl').text(job.vault_url || '-');
+        $('#exportMethod').html(`<span class="badge bg-primary text-capitalize">${job.export_method}</span>`);
+        $('#jqlQuery').text(job.jql || '-');
+        $('#projectKey').text(job.project_key || '-');
+        $('#parallelism').text(job.parallelism || 5);
+        
+        if (job.export_method === 'sharepoint') {
+            $('#sharepointRow').show();
+            $('#sharepointInfo').text(`${job.sharepoint_site} / ${job.sharepoint_folder}`);
+            $('#apiRow').hide();
+        } else if (job.export_method === 'api') {
+            $('#apiRow').show();
+            $('#apiInfo').text(job.custom_api_url || 'Custom API');
+            $('#sharepointRow').hide();
+        }
+        
+        // Timing
+        $('#createdAt').text(job.created_at ? new Date(job.created_at).toLocaleString() : '-');
+        $('#startedAt').text(job.started_at ? new Date(job.started_at).toLocaleString() : '-');
+        $('#completedAt').text(job.completed_at ? new Date(job.completed_at).toLocaleString() : '-');
+        
+        if (job.completed_at && job.started_at) {
+            const duration = new Date(job.completed_at) - new Date(job.started_at);
+            $('#duration').text(formatDuration(duration));
+        } else if (job.started_at) {
+            const duration = new Date() - new Date(job.started_at);
+            $('#duration').text(formatDuration(duration) + ' (running)');
+        }
+        
+        // Error
+        if (job.error_message) {
+            $('#errorSection').show();
+            $('#errorMessage').text(job.error_message);
+        } else {
+            $('#errorSection').hide();
+        }
+    }
+
+    function renderFailedIssues(logs) {
+        let html = '';
+        logs.slice(0, 10).forEach(log => {
+            html += `
+                <tr>
+                    <td><code>${log.issue_key}</code></td>
+                    <td><small class="text-danger">${truncate(log.error_details || log.message || 'Unknown error', 60)}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning" onclick="retryIssue('${log.issue_key}')" 
+                                ${!log.can_retry ? 'disabled' : ''}>
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        if (logs.length > 10) {
+            html += `<tr><td colspan="3" class="text-center text-muted">... and ${logs.length - 10} more</td></tr>`;
+        }
+        $('#failedIssuesTable').html(html);
+    }
+
+    function updateProgress(data) {
+        if (data.current_issue) {
+            $('#currentIssueKey').text(data.current_issue);
+        }
+        const pct = Number(data.progress_percent);
+        if (!isNaN(pct)) {
+            $('#progressValue').text(Math.round(pct));
+            $('#progressPath').attr('stroke-dasharray', pct + ', 100');
+            $('#progressCircle').show();
+        }
+    }
+
+    function startAutoRefresh() {
+        if (!autoRefresh) {
+            autoRefresh = setInterval(loadJob, 15000);
+        }
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefresh) {
+            clearInterval(autoRefresh);
+            autoRefresh = null;
+        }
+    }
+
+    function refreshJob() {
+        loadJob();
+    }
+
+    function cancelJob() {
+        if (!confirm('Are you sure you want to stop this job? This will terminate the migration process.')) {
+            return;
+        }
+        
+        $('#cancelBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Stopping...');
+        
+        $.post(`/api/jobs/${jobId}/cancel`)
+            .done(function(response) {
+                showSuccess('Job stopped successfully');
+                loadJob();
+            })
+            .fail(function(xhr) {
+                const error = xhr.responseJSON?.detail || 'Failed to stop job';
+                showError('Error: ' + error);
+                $('#cancelBtn').prop('disabled', false).html('<i class="bi bi-stop-fill"></i> Stop Job');
+            });
+    }
+
+    function restartJob() {
+        if (!confirm('Are you sure you want to restart this job from scratch? This will process all issues again.')) {
+            return;
+        }
+        
+        $('#restartBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Restarting...');
+        
+        $.post(`/api/jobs/${jobId}/restart`)
+            .done(function(response) {
+                alert(`Job restarted successfully! New job ID: ${response.new_job_id}`);
+                window.location.href = `/jobs/${response.new_job_id}`;
+            })
+            .fail(function(xhr) {
+                const error = xhr.responseJSON?.detail || 'Failed to restart job';
+                alert('Error: ' + error);
+                $('#restartBtn').prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Restart');
+            });
+    }
+
+    function resumeJob() {
+        if (!confirm('Resume this job? Failed and unprocessed issues will be retried. Already successful issues will be skipped.')) {
+            return;
+        }
+        
+        $('#resumeBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Resuming...');
+        
+        $.post(`/api/jobs/${jobId}/resume`)
+            .done(function(response) {
+                let msg = `Job resumed! New job ID: ${response.new_job_id}\n`;
+                if (response.failed_issues > 0) {
+                    msg += `- ${response.failed_issues} failed issues to retry\n`;
+                }
+                if (response.unprocessed_issues > 0) {
+                    msg += `- ${response.unprocessed_issues} unprocessed issues\n`;
+                }
+                msg += `- ${response.issues_skipped} successful issues will be skipped`;
+                alert(msg);
+                window.location.href = `/jobs/${response.new_job_id}`;
+            })
+            .fail(function(xhr) {
+                const error = xhr.responseJSON?.detail || 'Failed to resume job';
+                alert('Error: ' + error);
+                $('#resumeBtn').prop('disabled', false).html('<i class="bi bi-play-fill"></i> Resume');
+            });
+    }
+
+    function retryFailed() {
+        resumeJob();
+    }
+
+    function retryIssue(issueKey) {
+        alert(`Single issue retry for ${issueKey} - use Resume to retry all failed issues`);
+    }
+
+    function getStatusBadge(status, large = false) {
+        const sizeClass = large ? 'fs-4 px-4 py-2' : '';
+        const badges = {
+            'pending': `<span class="badge bg-secondary ${sizeClass}">Pending</span>`,
+            'started': `<span class="badge bg-primary ${sizeClass}">Started</span>`,
+            'running': `<span class="badge bg-info ${sizeClass}"><span class="spinner-border spinner-border-sm me-1"></span>Running</span>`,
+            'completed': `<span class="badge bg-success ${sizeClass}">Completed</span>`,
+            'failed': `<span class="badge bg-danger ${sizeClass}">Failed</span>`
+        };
+        return badges[status] || `<span class="badge bg-secondary ${sizeClass}">${status}</span>`;
+    }
+
+    function formatDuration(ms) {
+        if (ms < 0) return '-';
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds % 60}s`;
+        } else {
+            return `${seconds}s`;
+        }
+    }
+
+    function truncate(str, len) {
+        if (!str) return '';
+        return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+</script>
+{% endblock %}

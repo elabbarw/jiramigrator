@@ -1,0 +1,54 @@
+FROM python:3.12-slim-bullseye
+
+WORKDIR /app
+
+# Install wkhtmltopdf and all dependencies in a single layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    xfonts-base \
+    xfonts-75dpi \
+    fontconfig \
+    libc6 \
+    libfreetype6 \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libssl1.1 \
+    libstdc++6 \
+    libx11-6 \
+    libxcb1 \
+    libxext6 \
+    libxrender1 \
+    libfontconfig1 \
+    zlib1g \
+    && wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb \
+    && dpkg -i wkhtmltox_0.12.6.1-2.bullseye_amd64.deb || apt-get install -f -y \
+    && rm wkhtmltox_0.12.6.1-2.bullseye_amd64.deb \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download spaCy model
+RUN python -m spacy download en_core_web_md || python -m spacy download en_core_web_sm || true
+
+# Copy project files
+COPY . .
+
+# Set PYTHONPATH to include the app directory so jiramigration is importable
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# wkhtmltopdf is now installed system-wide via apt
+
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
+
+# Expose port for the application
+EXPOSE 8000
+
+# Command to run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
