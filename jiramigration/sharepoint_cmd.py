@@ -711,6 +711,16 @@ class JiraMigration:
         wait=wait_exponential(multiplier=2, min=3, max=30),
         reraise=True
     )
+    def _cleanup_issue_temp(self, local_vars):
+        """Clean up temp directories for an issue to free disk space."""
+        for name in ('issue_temp_dir', 'sp_temp_dir'):
+            d = local_vars.get(name)
+            if d and os.path.exists(d):
+                try:
+                    shutil.rmtree(d)
+                except Exception:
+                    pass
+
     def migrate_jira_issue(self, jirakey, batch_temp_dirs=None):
         """
         Use Atlassian Jira API to get a summary of an Issue
@@ -1159,39 +1169,34 @@ class JiraMigration:
                      # Depending on desired strictness, this could be `return False` or raise an error.
                      # For now, just a warning, as the issue might still be considered "processed" if no export was intended.
 
-            # Don't clean up temp directories here, they'll be cleaned up after the batch is done
+            # Clean up temp directories immediately after processing to prevent /tmp filling up
+            for d in [issue_temp_dir, sp_temp_dir if 'sp_temp_dir' in locals() else None]:
+                if d and os.path.exists(d):
+                    try:
+                        shutil.rmtree(d)
+                    except Exception:
+                        pass
+
             return {"success": True, "extracted_identifier": extracted_identifier, "error": None, "pdf_generated": pdf_generated, "attachments_count": len(attachments), "files_uploaded": attachment_counter}
 
         except AttributeError as e:
-            # Get detailed information about the AttributeError
             import traceback
-            error_traceback = traceback.format_exc()
             print(f"AttributeError in migrate_jira_issue for {jirakey}: {str(e)}")
-            
-            # Add a small delay before retrying to allow system to recover
+            self._cleanup_issue_temp(locals())
             time.sleep(2)
-            
-            # Re-raise the exception for the retry decorator to handle
             raise
         except Exception as e:
-            # Log the exception and re-raise to let the retry decorator handle it
             import traceback
             print(f"!!! Initial unhandled error in migrate_jira_issue for {jirakey} (before retry) !!!")
             print(f"Error Type: {type(e).__name__}")
-            print(f"Error Message: '{str(e)}'") # Explicitly show if message is empty or has only whitespace
-            # Add more details if it's an HTTPError from the requests library
+            print(f"Error Message: '{str(e)}'")
             if isinstance(e, requests.exceptions.HTTPError) and e.response is not None:
                 print(f"  HTTP Status Code: {e.response.status_code}")
-                print(f"  HTTP Response Text: {e.response.text[:500]}") # Print first 500 chars of response
+                print(f"  HTTP Response Text: {e.response.text[:500]}")
                 print(f"  HTTP Response Reason: {e.response.reason}")
             print(f"Full Traceback of initial error:\n{traceback.format_exc()}")
-            
-            # Original print, kept for consistency if other systems parse this exact format, but less informative
-            # print(f"Error in migrate_jira_issue for {jirakey}: {str(e)}") 
-            
-            time.sleep(2) # Original delay before retry
-            
-            # Re-raise the exception for the retry decorator to handle
+            self._cleanup_issue_temp(locals())
+            time.sleep(2)
             raise
 
 
