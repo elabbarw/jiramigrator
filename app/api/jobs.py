@@ -341,18 +341,28 @@ async def restart_job(job_id: int, db: Session = Depends(get_db)):
     task_data["job_db_id"] = new_job.id
     
     # Queue the task in Celery
-    if new_job.send_email and new_job.email:
-        result = process_migration.apply_async(
-            args=[task_data],
-            link=send_email_report.s(new_job.email)
-        )
+    if new_job.export_method == "confluence":
+        from app.celery.worker import process_confluence_migration
+        if new_job.send_email and new_job.email:
+            result = process_confluence_migration.apply_async(
+                args=[task_data],
+                link=send_email_report.s(new_job.email)
+            )
+        else:
+            result = process_confluence_migration.apply_async(args=[task_data])
     else:
-        result = process_migration.apply_async(args=[task_data])
-    
+        if new_job.send_email and new_job.email:
+            result = process_migration.apply_async(
+                args=[task_data],
+                link=send_email_report.s(new_job.email)
+            )
+        else:
+            result = process_migration.apply_async(args=[task_data])
+
     # Update job with Celery task ID
     new_job.celery_task_id = result.id
     db.commit()
-    
+
     return {
         "message": "Job restarted successfully",
         "original_job_id": job_id,
@@ -402,46 +412,60 @@ async def resume_job(job_id: int, db: Session = Depends(get_db)):
     # Calculate issues to process
     issues_to_process = []
     unprocessed_count = 0
-    
-    # Check if original job had specific issue keys (csv_data)
-    if original_config.get("csv_data"):
-        # Original job had a specific list of issues
-        original_issues = set(original_config["csv_data"])
-        # Issues to process = original list minus successful ones
-        issues_to_process = [k for k in original_config["csv_data"] if k not in successful_keys]
-        unprocessed_count = len(original_issues) - len(successful_keys) - len(failed_keys)
-    else:
-        # Original job used JQL - we'll re-run with the same JQL but skip successful issues
-        # Add failed keys to csv_data for immediate retry, 
-        # and keep the JQL for any issues that weren't even fetched
-        if failed_keys:
-            issues_to_process = failed_keys
-        
-        # If there were unprocessed issues (total > processed), we need to re-run JQL
+
+    if job.export_method == "confluence":
+        # For Confluence jobs, set skip_issues to successful page titles.
+        # ConfluenceMigration will filter these out after fetching pages.
+        task_data["skip_issues"] = list(successful_keys)
+        total_to_retry = len(failed_keys)
         if job.total_issues and job.processed_issues and job.total_issues > job.processed_issues:
             unprocessed_count = job.total_issues - job.processed_issues
-            # Keep the JQL to re-fetch and process remaining issues
-            task_data["skip_issues"] = list(successful_keys)
-        elif failed_keys:
-            # All issues were processed, just retry the failed ones
-            task_data["csv_data"] = failed_keys
-            task_data["jql"] = None
-    
-    # If we have specific issues to process, use csv_data
-    if issues_to_process:
-        task_data["csv_data"] = issues_to_process
-        if not unprocessed_count or unprocessed_count <= 0:
-            # No unprocessed issues from JQL, just use the specific list
-            task_data["jql"] = None
-    
-    # Always set skip_issues to avoid re-processing successful ones
-    task_data["skip_issues"] = list(successful_keys)
+            total_to_retry += unprocessed_count
+
+        if total_to_retry == 0:
+            raise HTTPException(status_code=400, detail="No pages to retry - all pages were successful")
+    else:
+        # Jira-specific resume logic
+        # Check if original job had specific issue keys (csv_data)
+        if original_config.get("csv_data"):
+            # Original job had a specific list of issues
+            original_issues = set(original_config["csv_data"])
+            # Issues to process = original list minus successful ones
+            issues_to_process = [k for k in original_config["csv_data"] if k not in successful_keys]
+            unprocessed_count = len(original_issues) - len(successful_keys) - len(failed_keys)
+        else:
+            # Original job used JQL - we'll re-run with the same JQL but skip successful issues
+            # Add failed keys to csv_data for immediate retry,
+            # and keep the JQL for any issues that weren't even fetched
+            if failed_keys:
+                issues_to_process = failed_keys
+
+            # If there were unprocessed issues (total > processed), we need to re-run JQL
+            if job.total_issues and job.processed_issues and job.total_issues > job.processed_issues:
+                unprocessed_count = job.total_issues - job.processed_issues
+                # Keep the JQL to re-fetch and process remaining issues
+                task_data["skip_issues"] = list(successful_keys)
+            elif failed_keys:
+                # All issues were processed, just retry the failed ones
+                task_data["csv_data"] = failed_keys
+                task_data["jql"] = None
+
+        # If we have specific issues to process, use csv_data
+        if issues_to_process:
+            task_data["csv_data"] = issues_to_process
+            if not unprocessed_count or unprocessed_count <= 0:
+                # No unprocessed issues from JQL, just use the specific list
+                task_data["jql"] = None
+
+        # Always set skip_issues to avoid re-processing successful ones
+        task_data["skip_issues"] = list(successful_keys)
+
+        total_to_retry = len(failed_keys) + max(0, unprocessed_count)
+
+        if total_to_retry == 0 and not task_data.get("jql"):
+            raise HTTPException(status_code=400, detail="No issues to retry - all issues were successful")
+
     task_data["resume_from_job_id"] = job_id
-    
-    total_to_retry = len(failed_keys) + max(0, unprocessed_count)
-    
-    if total_to_retry == 0 and not task_data.get("jql"):
-        raise HTTPException(status_code=400, detail="No issues to retry - all issues were successful")
     
     # Build description for the resumed job
     resume_desc_parts = []
@@ -455,7 +479,7 @@ async def resume_job(job_id: int, db: Session = Depends(get_db)):
         vault_url=job.vault_url,
         vault_name=job.vault_name,
         export_method=job.export_method,
-        jql=f"Resumed from Job #{job_id} - {resume_desc}",
+        jql=job.jql if job.export_method == "confluence" else f"Resumed from Job #{job_id} - {resume_desc}",
         project_key=job.project_key,
         sharepoint_site=job.sharepoint_site,
         sharepoint_folder=job.sharepoint_folder,
@@ -477,18 +501,28 @@ async def resume_job(job_id: int, db: Session = Depends(get_db)):
     task_data["job_db_id"] = new_job.id
     
     # Queue the task in Celery
-    if new_job.send_email and new_job.email:
-        result = process_migration.apply_async(
-            args=[task_data],
-            link=send_email_report.s(new_job.email)
-        )
+    if new_job.export_method == "confluence":
+        from app.celery.worker import process_confluence_migration
+        if new_job.send_email and new_job.email:
+            result = process_confluence_migration.apply_async(
+                args=[task_data],
+                link=send_email_report.s(new_job.email)
+            )
+        else:
+            result = process_confluence_migration.apply_async(args=[task_data])
     else:
-        result = process_migration.apply_async(args=[task_data])
-    
+        if new_job.send_email and new_job.email:
+            result = process_migration.apply_async(
+                args=[task_data],
+                link=send_email_report.s(new_job.email)
+            )
+        else:
+            result = process_migration.apply_async(args=[task_data])
+
     # Update job with Celery task ID
     new_job.celery_task_id = result.id
     db.commit()
-    
+
     return {
         "message": "Job resumed successfully",
         "original_job_id": job_id,

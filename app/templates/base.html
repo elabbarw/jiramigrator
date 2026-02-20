@@ -141,6 +141,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link {% if request.url.path == '/confluence' %}active{% endif %}" href="/confluence">
+                    <i class="bi bi-journal-richtext"></i> Confluence
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {% if '/jobs' in request.url.path %}active{% endif %}" href="/jobs">
                     <i class="bi bi-list-task"></i> Jobs
                 </a>

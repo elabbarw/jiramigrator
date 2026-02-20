@@ -298,6 +298,92 @@ def process_migration(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         # Raise exception to mark task as failed
         raise e
         
+
+@shared_task(bind=True)
+def process_confluence_migration(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process a Confluence migration task.
+
+    Args:
+        task_data: Dictionary containing Confluence migration parameters
+
+    Returns:
+        Dictionary with migration results
+    """
+    logger.info(f"Starting Confluence migration job {self.request.id}")
+    job_db_id = task_data.get('job_db_id')
+
+    if job_db_id:
+        update_job_status(job_db_id, 'started', started_at=datetime.utcnow())
+
+    try:
+        from jiramigration.confluence_cmd import ConfluenceMigration
+
+        # Build args namespace
+        args = argparse.Namespace()
+        args.confluence_url = task_data.get('confluence_url')
+        args.confluence_username = task_data.get('confluence_username')
+        args.confluence_token = task_data.get('confluence_token')
+        args.space_key = task_data.get('space_key')
+        args.cql = task_data.get('cql')
+        args.sharepoint_site = task_data.get('sharepoint_site')
+        args.sharepoint_folder = task_data.get('sharepoint_folder')
+        args.parallelism = task_data.get('parallelism', 5)
+        args.skip_issues = set(task_data.get('skip_issues', []))
+
+        if job_db_id:
+            update_job_status(job_db_id, 'running')
+
+        migration = ConfluenceMigration(args)
+
+        if job_db_id:
+            def progress_callback(issue_key, processed, total, status, error=None,
+                                  extracted_identifier=None, pdf_generated=False,
+                                  attachments_count=0, files_uploaded=0):
+                record_issue_result(
+                    job_db_id, issue_key, processed, total,
+                    status, error=error, extracted_identifier=extracted_identifier,
+                    pdf_generated=pdf_generated, attachments_count=attachments_count,
+                    files_uploaded=files_uploaded
+                )
+
+            migration.set_progress_callback(progress_callback)
+
+        migration_result = migration.start_migration()
+
+        if job_db_id:
+            result_data = migration_result if isinstance(migration_result, dict) else {"raw": str(migration_result)}
+            update_job_status(
+                job_db_id,
+                'completed',
+                completed_at=datetime.utcnow(),
+                result_data=result_data
+            )
+
+        self.update_state(state='SUCCESS')
+
+        return {
+            "status": "completed",
+            "job_id": self.request.id,
+            "db_job_id": job_db_id,
+            "details": migration_result
+        }
+
+    except Exception as e:
+        logger.error(f"Error in Confluence migration job {self.request.id}: {e}")
+        logger.error(traceback.format_exc())
+
+        if job_db_id:
+            update_job_status(
+                job_db_id,
+                'failed',
+                completed_at=datetime.utcnow(),
+                error_message=str(e)
+            )
+
+        self.update_state(state='FAILURE', meta={"error": str(e)})
+        raise e
+
 @shared_task
 def send_email_report(migration_result: Dict[str, Any], recipient_email: str) -> Dict[str, Any]:
     """
@@ -317,7 +403,7 @@ def send_email_report(migration_result: Dict[str, Any], recipient_email: str) ->
         msg = MIMEMultipart()
         msg['From'] = settings.EMAIL_FROM
         msg['To'] = recipient_email
-        msg['Subject'] = f"Jira Migration Report - Job {migration_result['job_id']}"
+        msg['Subject'] = f"Migration Report - Job {migration_result['job_id']}"
 
         # Render email body from template
         template = jinja_env.get_template('migration_report.html')

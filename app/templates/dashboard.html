@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Jira Migration{% endblock %}
+{% block title %}Dashboard - Migration{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
         <h1>Dashboard</h1>
-        <p class="text-muted mb-0">Overview of your Jira migration activities</p>
+        <p class="text-muted mb-0">Overview of your migration activities</p>
     </div>
     <a href="/migrate" class="btn btn-primary">
         <i class="bi bi-plus-lg"></i> New Migration
@@ -62,7 +62,7 @@
                 </div>
                 <div>
                     <div class="stat-value" id="totalIssues">-</div>
-                    <div class="stat-label">Issues Migrated</div>
+                    <div class="stat-label">Items Migrated</div>
                 </div>
             </div>
         </div>
@@ -135,6 +135,9 @@
                 <div class="d-grid gap-2">
                     <a href="/migrate" class="btn btn-outline-primary text-start">
                         <i class="bi bi-upload me-2"></i> Start New Migration
+                    </a>
+                    <a href="/confluence" class="btn btn-outline-primary text-start">
+                        <i class="bi bi-journal-richtext me-2"></i> Confluence Migration
                     </a>
                     <a href="/jobs" class="btn btn-outline-secondary text-start">
                         <i class="bi bi-list-task me-2"></i> View All Jobs
@@ -247,7 +250,8 @@
     function renderExportMethods(methods) {
         const colors = {
             'sharepoint': '#0d6efd',
-            'api': '#198754'
+            'api': '#198754',
+            'confluence': '#6f42c1'
         };
         
         const total = Object.values(methods).reduce((a, b) => a + b, 0);
@@ -318,7 +322,8 @@
             'started': '<span class="badge bg-primary">Started</span>',
             'running': '<span class="badge bg-info">Running</span>',
             'completed': '<span class="badge bg-success">Completed</span>',
-            'failed': '<span class="badge bg-danger">Failed</span>'
+            'failed': '<span class="badge bg-danger">Failed</span>',
+            'cancelled': '<span class="badge bg-secondary">Cancelled</span>'
         };
         return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
     }

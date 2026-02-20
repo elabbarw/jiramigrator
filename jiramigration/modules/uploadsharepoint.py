@@ -1,6 +1,8 @@
+import logging
 import os
 import threading
 import time
+from urllib.parse import urlparse
 
 import msal
 import requests
@@ -10,61 +12,77 @@ from office365.sharepoint.client_context import ClientContext
 from office365.runtime.compat import get_absolute_url
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+logger = logging.getLogger(__name__)
+
+# SharePoint limits
+SHAREPOINT_MAX_PATH_LENGTH = 400
+
 # SharePoint authentication constants - loaded once at module level
 SHAREPOINT_TENANT = os.getenv('SHAREPOINT_TENANT', 'your-tenant.onmicrosoft.com')
 CERTIFICATE_THUMBPRINT = os.getenv('CERTIFICATE_THUMBPRINT', '')
 
 
-def create_sharepoint_context(sharepoint_site, tenant, client_id, thumbprint, private_key):
+def create_msal_app(tenant, client_id, thumbprint, private_key):
+    """
+    Create a reusable MSAL ConfidentialClientApplication.
+
+    The app instance contains an in-memory token cache so that tokens are
+    reused across requests and automatically refreshed when they expire.
+    Create this ONCE and pass it to create_sharepoint_context() for each
+    new ClientContext.
+    """
+    authority_url = f"https://login.microsoftonline.com/{tenant}"
+    credentials = {
+        "thumbprint": thumbprint,
+        "private_key": private_key,
+    }
+    return msal.ConfidentialClientApplication(
+        client_id,
+        authority=authority_url,
+        client_credential=credentials,
+    )
+
+
+def create_sharepoint_context(sharepoint_site, tenant, client_id, thumbprint, private_key,
+                              msal_app=None):
     """
     Create a SharePoint ClientContext with certificate authentication.
-    
+
     This function works around an issue where the Office365-REST-Python-Client
     library includes 'passphrase: None' in the MSAL credentials dictionary,
     which newer MSAL versions reject.
-    
+
     Args:
         sharepoint_site: SharePoint site URL
         tenant: Azure AD tenant (e.g., 'contoso.onmicrosoft.com')
         client_id: Azure AD application client ID
         thumbprint: Certificate thumbprint (hex encoded)
         private_key: PEM-encoded private key content
-        
+        msal_app: Optional existing MSAL app to reuse (preserves token cache)
+
     Returns:
         ClientContext: Authenticated SharePoint client context
     """
-    # Build the authority URL
-    authority_url = f"https://login.microsoftonline.com/{tenant}"
-    
     # Build scopes for SharePoint
     resource = get_absolute_url(sharepoint_site)
     scopes = [f"{resource}/.default"]
-    
-    # Create credentials dict WITHOUT passphrase if not needed
-    # This is the key fix - MSAL rejects passphrase: None
-    credentials = {
-        "thumbprint": thumbprint,
-        "private_key": private_key,
-    }
-    
-    # Create MSAL confidential client application
-    app = msal.ConfidentialClientApplication(
-        client_id,
-        authority=authority_url,
-        client_credential=credentials,
-    )
-    
-    # Token acquisition function
+
+    # Reuse existing MSAL app or create a new one
+    if msal_app is None:
+        msal_app = create_msal_app(tenant, client_id, thumbprint, private_key)
+
+    # Token acquisition function — uses the shared MSAL app so tokens are
+    # cached and refreshed automatically instead of hitting Azure AD every time.
     def acquire_token():
-        result = app.acquire_token_for_client(scopes)
+        result = msal_app.acquire_token_for_client(scopes)
         if "error" in result:
             raise ValueError(f"Failed to acquire token: {result.get('error_description', result.get('error'))}")
         return TokenResponse.from_json(result)
-    
+
     # Create context with custom token provider
     ctx = ClientContext(sharepoint_site)
     ctx.with_access_token(acquire_token)
-    
+
     return ctx
 
 # Configure a session with larger connection pool for SharePoint
@@ -126,20 +144,31 @@ class SharepointUpload():
         self.sharepoint_site = sharepoint_site
         self.client_id = client_id
         self.key = key
-        
+
         # Configure session for SharePoint requests
         self.auth_session = sharepoint_session
-        
+
+        # Create a single MSAL app for the lifetime of this uploader.
+        # The app holds an in-memory token cache so tokens are reused
+        # across uploads and automatically refreshed on expiry, avoiding
+        # redundant token requests that cause intermittent 401 errors.
+        self._msal_app = create_msal_app(
+            tenant=SHAREPOINT_TENANT,
+            client_id=client_id,
+            thumbprint=CERTIFICATE_THUMBPRINT,
+            private_key=key,
+        )
+
         # Set up and authenticate with SharePoint using the certificate
-        # Using custom function that properly formats MSAL credentials
         self.ctx = create_sharepoint_context(
             sharepoint_site=sharepoint_site,
             tenant=SHAREPOINT_TENANT,
             client_id=client_id,
             thumbprint=CERTIFICATE_THUMBPRINT,
-            private_key=key
+            private_key=key,
+            msal_app=self._msal_app,
         )
-        
+
         # Configure connection limits for SharePoint client
         # Increase timeout and connection limits
         if hasattr(self.ctx, 'request_timeout'):
@@ -172,14 +201,62 @@ class SharepointUpload():
         # Return shortened filename with original extension
         return shortened_base + ext
 
+    def _get_site_path(self):
+        """Extract the site-relative path from the SharePoint site URL.
+
+        E.g., 'https://gamesys.sharepoint.com/sites/ConfluenceSpacesArchive'
+        returns '/sites/ConfluenceSpacesArchive'
+        """
+        parsed = urlparse(self.sharepoint_site)
+        return parsed.path.rstrip('/')
+
+    def _safe_filename_for_path(self, sharepoint_folder, filename):
+        """Shorten filename if the total SharePoint path would exceed 400 chars.
+
+        SharePoint enforces a 400-character limit on the full server-relative
+        URL path for files and folders.
+
+        Args:
+            sharepoint_folder: The SharePoint folder path (site-relative)
+            filename: The file name to potentially shorten
+
+        Returns:
+            str: The filename, shortened if necessary to fit the path limit
+        """
+        site_path = self._get_site_path()
+        # Total server-relative path: /site_path/sharepoint_folder/filename
+        total_length = len(site_path) + 1 + len(sharepoint_folder) + 1 + len(filename)
+
+        if total_length <= SHAREPOINT_MAX_PATH_LENGTH:
+            return filename
+
+        # Calculate available space for filename
+        overhead = len(site_path) + 1 + len(sharepoint_folder) + 1
+        available = SHAREPOINT_MAX_PATH_LENGTH - overhead
+
+        if available < 20:
+            available = 20
+            logger.warning(
+                "SharePoint folder path is very long (%d chars), "
+                "filename will be heavily truncated", overhead
+            )
+
+        shortened = self._shorten_filename(filename, max_length=available)
+        logger.warning(
+            "Truncated filename from '%s' to '%s' to fit SharePoint "
+            "400-char path limit (folder path: %d chars)",
+            filename, shortened, overhead
+        )
+        return shortened
+
     def _get_folder_lock(self, folder_path):
         """
         Get a lock for a specific SharePoint folder path.
         This prevents concurrent uploads to the same folder.
-        
+
         Args:
             folder_path: The SharePoint folder path
-            
+
         Returns:
             threading.Lock: A lock object for the folder
         """
@@ -231,14 +308,16 @@ class SharepointUpload():
         with folder_lock:
             print(f"Acquired lock for folder {sharepoint_folder}")
             
-            # Reset context for each retry attempt to avoid stale connections
-            # Using custom function that properly formats MSAL credentials
+            # Fresh context per upload to avoid stale connections, but reuse
+            # the shared MSAL app so tokens come from cache instead of a new
+            # Azure AD request each time.
             ctx = create_sharepoint_context(
                 sharepoint_site=self.sharepoint_site,
                 tenant=SHAREPOINT_TENANT,
                 client_id=self.client_id,
                 thumbprint=CERTIFICATE_THUMBPRINT,
-                private_key=self.key
+                private_key=self.key,
+                msal_app=self._msal_app,
             )
             
             # Add a delay to avoid rate limiting
@@ -272,7 +351,10 @@ class SharepointUpload():
                     try:
                         with open(file_path, 'rb') as file:
                             file_content = file.read()
-                            uploaded_file = target_folder.upload_file(os.path.basename(file_name), file_content)
+                            sp_filename = self._safe_filename_for_path(
+                                sharepoint_folder, os.path.basename(file_name)
+                            )
+                            uploaded_file = target_folder.upload_file(sp_filename, file_content)
                             ctx.execute_query()
 
                             # Add tags to the file

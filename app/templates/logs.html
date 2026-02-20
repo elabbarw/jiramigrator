@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Logs - Job #{{ job_id }} - Jira Migration{% endblock %}
+{% block title %}Logs - Job #{{ job_id }} - Migration{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -96,7 +96,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Search Issue Key</label>
-                <input type="text" class="form-control" id="searchFilter" placeholder="e.g., PROJ-123">
+                <input type="text" class="form-control" id="searchFilter" placeholder="Search by key or title...">
             </div>
             <div class="col-md-2">
                 <label class="form-label">Limit</label>
@@ -127,7 +127,7 @@
             <table class="table table-hover table-sm align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>Issue Key</th>
+                        <th>Issue Key / Page</th>
                         <th>Status</th>
                         <th>Extracted Identifier</th>
                         <th>PDF</th>

@@ -41,6 +41,19 @@ class MigrationRequest(BaseModel):
     include_manual_fields: Optional[bool] = False
     manual_fields: Optional[List[str]] = None
 
+class ConfluenceMigrationRequest(BaseModel):
+    """Model for Confluence migration request."""
+    confluence_url: str
+    confluence_username: str
+    confluence_token: str
+    space_key: Optional[str] = None
+    cql: Optional[str] = None
+    sharepoint_site: str
+    sharepoint_folder: str
+    parallelism: Optional[int] = 5
+    send_email: Optional[bool] = False
+    email: Optional[EmailStr] = None
+
 @router.post("/migration/submit")
 async def submit_migration(request: MigrationRequest, db: Session = Depends(get_db)):
     """Submit a migration job."""
@@ -232,4 +245,64 @@ async def upload_csv(file: UploadFile = File(...)):
     except Exception as e:
         # Log the exception
         print(f"Error uploading CSV: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/confluence/submit")
+async def submit_confluence_migration(request: ConfluenceMigrationRequest, db: Session = Depends(get_db)):
+    """Submit a Confluence migration job."""
+    try:
+        if not request.space_key and not request.cql:
+            raise HTTPException(
+                status_code=400,
+                detail="One of space_key or cql must be provided"
+            )
+
+        task_data = request.dict()
+        task_data["job_type"] = "confluence"
+
+        # Create job record (reuse Job model with export_method='confluence')
+        job = Job(
+            vault_url=request.confluence_url,
+            vault_name=request.confluence_username,
+            export_method="confluence",
+            jql=request.cql,
+            project_key=request.space_key,
+            sharepoint_site=request.sharepoint_site,
+            sharepoint_folder=request.sharepoint_folder,
+            status="pending",
+            parallelism=request.parallelism or 5,
+            send_email=request.send_email or False,
+            email=request.email,
+            config_data=task_data,
+            created_at=datetime.utcnow()
+        )
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+
+        task_data["job_db_id"] = job.id
+
+        # Import here to avoid circular imports
+        from app.celery.worker import process_confluence_migration, send_email_report
+
+        if request.send_email and request.email:
+            result = process_confluence_migration.apply_async(
+                args=[task_data],
+                link=send_email_report.s(request.email)
+            )
+        else:
+            result = process_confluence_migration.apply_async(args=[task_data])
+
+        job.celery_task_id = result.id
+        db.commit()
+
+        return {
+            "job_id": result.id,
+            "db_job_id": job.id,
+            "status": "submitted"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting Confluence migration job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

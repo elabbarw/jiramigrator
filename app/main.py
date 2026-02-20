@@ -174,6 +174,12 @@ async def migrate_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/confluence")
+async def confluence_page(request: Request):
+    """Serve the Confluence migration form page."""
+    return templates.TemplateResponse("confluence.html", {"request": request})
+
+
 @app.get("/jobs")
 async def jobs_page(request: Request):
     """Serve the jobs list page."""

@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     SHAREPOINT_SITE: str = os.getenv("SHAREPOINT_SITE", "")
     CLIENT_ID: str = os.getenv("client_id", "")
 
+    # Confluence settings
+    CONFLUENCE_URL: str = os.getenv("CONFLUENCE_URL", "")
+    CONFLUENCE_USERNAME: str = os.getenv("CONFLUENCE_USERNAME", "")
+    CONFLUENCE_TOKEN: str = os.getenv("CONFLUENCE_TOKEN", "")
+
     # File paths
     CERT_FILE: str = os.getenv("CERT_FILE", "certs/certificate.crt")
     KEY_FILE: str = os.getenv("KEY_FILE", "certs/certificate.pem")

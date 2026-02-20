@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - Jira Migration{% endblock %}
+{% block title %}Settings - Migration{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -57,6 +57,7 @@
                         <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('azure')" id="filter-azure">Azure/Entra ID</button>
                         <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('email')" id="filter-email">Email</button>
                         <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('api')" id="filter-api">API</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="filterEnvVars('confluence')" id="filter-confluence">Confluence</button>
                     </div>
                 </div>
                 
@@ -201,6 +202,7 @@
                                 <option value="azure">Azure/Entra ID</option>
                                 <option value="email">Email</option>
                                 <option value="api">API</option>
+                                <option value="confluence">Confluence</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -711,6 +713,7 @@
             'azure': 'warning',
             'email': 'secondary',
             'api': 'success',
+            'confluence': 'info',
             'general': 'dark'
         };
         return `<span class="badge bg-${colors[category] || 'secondary'}">${category}</span>`;

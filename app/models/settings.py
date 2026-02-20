@@ -118,4 +118,9 @@ DEFAULT_ENV_VARS = [
     {"key": "SMTP_USERNAME", "description": "SMTP username", "category": "email"},
     {"key": "SMTP_PASSWORD", "description": "SMTP password", "category": "email", "is_secret": True},
     {"key": "EMAIL_FROM", "description": "From email address for notifications", "category": "email"},
+
+    # Confluence settings
+    {"key": "CONFLUENCE_URL", "description": "Confluence Server/DC base URL (e.g., https://confluence.company.com)", "category": "confluence", "is_required": True},
+    {"key": "CONFLUENCE_USERNAME", "description": "Confluence username", "category": "confluence", "is_required": True},
+    {"key": "CONFLUENCE_TOKEN", "description": "Confluence password or personal access token", "category": "confluence", "is_secret": True, "is_required": True},
 ]
