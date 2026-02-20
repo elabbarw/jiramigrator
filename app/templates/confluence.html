@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Confluence Migration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Confluence Migration</h1>
+    <p class="text-muted mb-0">Export Confluence pages as PDFs to SharePoint</p>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Confluence Migration Form</h5>
+            </div>
+            <div class="card-body">
+                <form id="confluenceForm" method="post">
+                    <div class="mb-3">
+                        <label for="confluence_url" class="form-label">Confluence URL</label>
+                        <input type="url" class="form-control" id="confluence_url" name="confluence_url" placeholder="https://confluence.company.com" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="confluence_username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="confluence_username" name="confluence_username" placeholder="john.doe" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="confluence_token" class="form-label">Token / Password</label>
+                            <input type="password" class="form-control" id="confluence_token" name="confluence_token" placeholder="Your personal access token" required>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6 class="mb-3">Page Selection</h6>
+                    <div class="mb-3">
+                        <label for="space_key" class="form-label">Space Key</label>
+                        <input type="text" class="form-control" id="space_key" name="space_key" placeholder="e.g. DEV">
+                    </div>
+                    <div class="mb-3">
+                        <label for="cql" class="form-label">CQL Query</label>
+                        <textarea class="form-control" id="cql" name="cql" rows="2" placeholder='e.g. space=DEV AND label=archive'></textarea>
+                    </div>
+                    <div class="form-text mb-3">Provide a Space Key, a CQL query, or both. If both are given, CQL takes precedence.</div>
+
+                    <hr>
+                    <h6 class="mb-3">SharePoint Destination</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="sharepoint_site" class="form-label">SharePoint Site</label>
+                            <input type="text" class="form-control" id="sharepoint_site" name="sharepoint_site" placeholder="https://company.sharepoint.com/sites/MySite" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="sharepoint_folder" class="form-label">SharePoint Folder</label>
+                            <input type="text" class="form-control" id="sharepoint_folder" name="sharepoint_folder" placeholder="Shared Documents/Confluence Export" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="parallelism" class="form-label">Parallelism</label>
+                        <input type="number" class="form-control" id="parallelism" name="parallelism" min="1" max="50" value="5">
+                        <div class="form-text">Number of parallel page exports (1-50)</div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="send_email" name="send_email">
+                        <label class="form-check-label" for="send_email">Send email report when done</label>
+                    </div>
+                    <div id="emailField" class="mb-3" style="display: none;">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="user@company.com">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-cloud-upload"></i> Start Migration
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let confluenceSubmitting = false;
+
+    // Toggle email field
+    $('#send_email').change(function() {
+        const checked = $(this).is(':checked');
+        $('#emailField').toggle(checked);
+        $('#email').prop('required', checked);
+    });
+
+    // Form submission
+    $('#confluenceForm').submit(function(e) {
+        e.preventDefault();
+        if (confluenceSubmitting) return;
+
+        const spaceKey = ($('#space_key').val() || '').trim();
+        const cql = ($('#cql').val() || '').trim();
+
+        if (!spaceKey && !cql) {
+            showError('Please provide a Space Key or CQL query.');
+            return;
+        }
+
+        confluenceSubmitting = true;
+
+        const btn = $(this).find('button[type="submit"]');
+        const origHtml = btn.html();
+        btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
+        btn.prop('disabled', true);
+
+        const data = {
+            confluence_url: $('#confluence_url').val(),
+            confluence_username: $('#confluence_username').val(),
+            confluence_token: $('#confluence_token').val(),
+            space_key: spaceKey || null,
+            cql: cql || null,
+            sharepoint_site: $('#sharepoint_site').val(),
+            sharepoint_folder: $('#sharepoint_folder').val(),
+            parallelism: Math.min(50, Math.max(1, parseInt($('#parallelism').val()) || 5)),
+            send_email: $('#send_email').is(':checked'),
+            email: $('#send_email').is(':checked') ? $('#email').val() : null
+        };
+
+        $.ajax({
+            url: '/api/confluence/submit',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            timeout: 30000,
+            success: function(response) {
+                btn.html(origHtml);
+                btn.prop('disabled', false);
+                confluenceSubmitting = false;
+                window.location.href = '/jobs/' + response.db_job_id;
+            },
+            error: function(xhr) {
+                btn.html(origHtml);
+                btn.prop('disabled', false);
+                confluenceSubmitting = false;
+                let msg = 'An error occurred.';
+                try { msg = JSON.parse(xhr.responseText).detail || msg; } catch(e) {}
+                showError(msg);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

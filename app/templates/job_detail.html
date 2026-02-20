@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Job #{{ job_id }} - Jira Migration{% endblock %}
+{% block title %}Job #{{ job_id }} - Migration{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -134,7 +134,7 @@
                 <table class="table table-sm">
                     <tbody>
                         <tr>
-                            <th width="35%">Vault URL</th>
+                            <th width="35%" id="vaultUrlLabel">Vault URL</th>
                             <td id="vaultUrl">-</td>
                         </tr>
                         <tr>
@@ -142,11 +142,11 @@
                             <td id="exportMethod">-</td>
                         </tr>
                         <tr>
-                            <th>JQL Query</th>
+                            <th id="jqlLabel">JQL Query</th>
                             <td><code id="jqlQuery">-</code></td>
                         </tr>
                         <tr>
-                            <th>Project Key</th>
+                            <th id="projectKeyLabel">Project Key</th>
                             <td id="projectKey">-</td>
                         </tr>
                         <tr id="sharepointRow" style="display: none;">
@@ -449,7 +449,7 @@
         $('#projectKey').text(job.project_key || '-');
         $('#parallelism').text(job.parallelism || 5);
         
-        if (job.export_method === 'sharepoint') {
+        if (job.export_method === 'sharepoint' || job.export_method === 'confluence') {
             $('#sharepointRow').show();
             $('#sharepointInfo').text(`${job.sharepoint_site} / ${job.sharepoint_folder}`);
             $('#apiRow').hide();
@@ -457,6 +457,12 @@
             $('#apiRow').show();
             $('#apiInfo').text(job.custom_api_url || 'Custom API');
             $('#sharepointRow').hide();
+        }
+
+        if (job.export_method === 'confluence') {
+            $('#vaultUrlLabel').text('Confluence URL');
+            $('#jqlLabel').text('CQL Query');
+            $('#projectKeyLabel').text('Space Key');
         }
         
         // Timing
@@ -612,7 +618,8 @@
             'started': `<span class="badge bg-primary ${sizeClass}">Started</span>`,
             'running': `<span class="badge bg-info ${sizeClass}"><span class="spinner-border spinner-border-sm me-1"></span>Running</span>`,
             'completed': `<span class="badge bg-success ${sizeClass}">Completed</span>`,
-            'failed': `<span class="badge bg-danger ${sizeClass}">Failed</span>`
+            'failed': `<span class="badge bg-danger ${sizeClass}">Failed</span>`,
+            'cancelled': `<span class="badge bg-secondary ${sizeClass}"><i class="bi bi-stop-circle"></i> Cancelled</span>`
         };
         return badges[status] || `<span class="badge bg-secondary ${sizeClass}">${status}</span>`;
     }

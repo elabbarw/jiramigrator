@@ -119,9 +119,10 @@ def normalize_filename(filename):
     return normalized
 
 
-def shorten_filename(name, max_length=200):
+def shorten_filename(name, max_length=120):
     """
-    Shorten a filename if it exceeds max_length
+    Shorten a filename if it exceeds max_length.
+    Default 120 chars to stay within SharePoint's per-file and total path limits.
     """
     if len(name) <= max_length:
         return name

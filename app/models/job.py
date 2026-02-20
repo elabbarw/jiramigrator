@@ -58,11 +58,15 @@ class Job(Base):
             "id": self.id,
             "celery_task_id": self.celery_task_id,
             "vault_url": self.vault_url,
+            "vault_name": self.vault_name,
             "export_method": self.export_method,
             "jql": self.jql,
             "project_key": self.project_key,
             "sharepoint_site": self.sharepoint_site,
             "sharepoint_folder": self.sharepoint_folder,
+            "api_type": self.api_type,
+            "environment": self.environment,
+            "custom_api_url": self.custom_api_url,
             "status": self.status,
             "total_issues": self.total_issues,
             "processed_issues": self.processed_issues,
@@ -84,7 +88,7 @@ class JobLog(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
     
     # Log details
-    issue_key = Column(String(50), index=True)
+    issue_key = Column(String(255), index=True)
     status = Column(String(50), index=True)  # success, failed, skipped
     message = Column(Text, nullable=True)
     error_details = Column(Text, nullable=True)
@@ -138,7 +142,7 @@ class JobProgress(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
     
     # Progress info
-    current_issue = Column(String(50), nullable=True)
+    current_issue = Column(String(255), nullable=True)
     current_step = Column(String(100), nullable=True)
     progress_percent = Column(Float, default=0.0)
     message = Column(Text, nullable=True)
